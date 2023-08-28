@@ -62,10 +62,7 @@ class MainWindow(QMainWindow):
         self.r_button_group.addButton(self.r10_button)
         self.r_button_group.addButton(self.r20_button)
         self.r_button_group.addButton(self.r60_button)
-
-        #  TODO: Enable r10 button
-        self.r10_button.setEnabled(False)
-        self.r20_button.setChecked(True)
+        self.r_button_group.buttonClicked.connect(self.r_button_group_clicked)
 
         self.shape_line = QLineEdit(self.widget)
         self.shape_line.setPlaceholderText("Путь к shape-файлу")
@@ -105,7 +102,8 @@ class MainWindow(QMainWindow):
         self.coefficient_choice_button = QPushButton("Коэффициенты", self.widget)
         self.coefficient_choice_button.clicked.connect(self.coefficient_choice_button_clicked)
         self.choice_button_layout.addWidget(self.coefficient_choice_button)
-        self.coefficient_choice_widget = CheckboxListWidget(self.widget, choices=const.coefficient_names)
+        self.coefficient_choice_widget = CheckboxListWidget(self.widget)
+        self.r_button_group_clicked()
 
         self.start_button = QPushButton("Начать", self.widget)
         self.start_button.clicked.connect(self.start_button_clicked)
@@ -196,6 +194,17 @@ class MainWindow(QMainWindow):
             self.new_thread.start()
             self.start_button.setText("Идет обработка...")
             self.start_button.setEnabled(False)
+
+    def r_button_group_clicked(self):
+        btn = self.r_button_group.checkedButton()
+        choices = []
+        if btn is self.r10_button:
+            choices = const.coefficient_names_r10
+        if btn is self.r20_button:
+            choices = const.coefficient_names_r20
+        if btn is self.r60_button:
+            choices = const.coefficient_names_r60
+        self.coefficient_choice_widget.set_choices(choices)
 
     def progress_changed(self, percent):
         self.message(f"Завершено на {percent}%")
