@@ -96,7 +96,6 @@ def processing(data, callback):
                 file_width = file.width
                 file_height = file.height
         for coefficient_ind, coefficient in enumerate(allowed_coefficients):
-            #  TODO: possible index error
             callback((ind * len(allowed_coefficients) + coefficient_ind) * 50 / (len(dates) * len(allowed_coefficients)))
             coefficient_data = np.zeros((1, ))
             if coefficient == "NDVI":
@@ -185,4 +184,5 @@ def processing(data, callback):
                     data[key] = np.nan
                 rows.append({"x": x, "y": y, **data})
             df = pd.DataFrame(rows, columns=['x', 'y', *sorted(dates)])
+            df = df.loc[:, ~df.columns.duplicated()].copy()
             df.to_csv(os.path.join(output, coefficient, match_fields[field_index] + ".csv"), index=False)
