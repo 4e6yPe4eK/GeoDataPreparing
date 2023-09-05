@@ -114,6 +114,26 @@ def processing(data, callback):
                 coefficient_data = all_coefficients[coefficient]
             coefficient_path = os.path.join(output, "buffer", date, coefficient + ".tiff")
 
+            # Гармонизация данных
+            offset_coefficients = [
+                "B01",
+                "B02",
+                "B03",
+                "B04",
+                "B05",
+                "B06",
+                "B07",
+                "B08",
+                "B8A",
+                "B09",
+                "B10",
+                "B11",
+                "B12",
+            ]
+            offset = 1000
+            if coefficient in offset_coefficients and date >= "2022-01-25":
+                coefficient_data = np.clip(coefficient_data, offset, 32767) - offset
+
             # Записываем каждый коеффициент в файл
             with rasterio.open(os.path.join(output, "buffer", date, coefficient + "_no_crs" + ".tiff"), "w", driver="GTiff", height=file_height, width=file_width, count=1, dtype="float32", crs=file_crs, transform=file_transform) as coefficient_file:
                 coefficient_file.write(coefficient_data, 1)
