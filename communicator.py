@@ -14,6 +14,23 @@ from rasterio.warp import calculate_default_transform, reproject, Resampling
 import const
 
 
+def translate_coefficient_name(coefficient_name):
+    """
+    Функция, возвращающая удобное название коэффициента
+    :param coefficient_name: Оригинальное название коэффициента
+    :return: Удобное название коэффициента
+    """
+    if coefficient_name == "B02":
+        return "BLUE"
+    if coefficient_name == "B03":
+        return "GREEN"
+    if coefficient_name == "B04":
+        return "RED"
+    if coefficient_name == "B08" or coefficient_name == "B8A":
+        return "NIR"
+    return coefficient_name
+
+
 def parse_directories(data, callback):
     base_directory = data["directory"]
     processing_directories = glob.glob(os.path.join(base_directory, "*"))
@@ -51,46 +68,35 @@ def processing(data, callback):
     pathlib.Path(os.path.join(output, "buffer")).mkdir(parents=True, exist_ok=True)
     for ind, date in enumerate(dates):
         pathlib.Path(os.path.join(output, "buffer", date)).mkdir(parents=True, exist_ok=True)
-        # with rasterio.open(glob.glob(os.path.join(directories[ind], "IMG_DATA", resolution, "*_B02_*.jp2"))[0]) as blue_file:
-        #     blue = blue_file.read(1).astype("float32")
-        # with rasterio.open(glob.glob(os.path.join(directories[ind], "IMG_DATA", resolution, "*_B03_*.jp2"))[0]) as green_file:
-        #     green = green_file.read(1).astype("float32")
-        # with rasterio.open(glob.glob(os.path.join(directories[ind], "IMG_DATA", resolution, "*_B04_*.jp2"))[0]) as red_file:
-        #     red = red_file.read(1).astype("float32")
-        # with rasterio.open(glob.glob(os.path.join(directories[ind], "IMG_DATA", resolution, "*_B05_*.jp2"))[0]) as b05_file:
-        #     b05 = b05_file.read(1).astype("float32")
-        # with rasterio.open(glob.glob(os.path.join(directories[ind], "IMG_DATA", resolution, "*_B06_*.jp2"))[0]) as b06_file:
-        #     b06 = b06_file.read(1).astype("float32")
-        # with rasterio.open(glob.glob(os.path.join(directories[ind], "IMG_DATA", resolution, "*_B07_*.jp2"))[0]) as b07_file:
-        #     b07 = b07_file.read(1).astype("float32")
-        # with rasterio.open(glob.glob(os.path.join(directories[ind], "IMG_DATA", resolution, "*_B8A_*.jp2"))[0]) as nir_file:
-        #     nir = nir_file.read(1).astype("float32")
-        # with rasterio.open(glob.glob(os.path.join(directories[ind], "IMG_DATA", resolution, "*_B11_*.jp2"))[0]) as b11_file:
-        #     b11 = b11_file.read(1).astype("float32")
-        # with rasterio.open(glob.glob(os.path.join(directories[ind], "IMG_DATA", resolution, "*_B12_*.jp2"))[0]) as b12_file:
-        #     b12 = b12_file.read(1).astype("float32")
-        # with rasterio.open(glob.glob(os.path.join(directories[ind], "IMG_DATA", resolution, "*_SCL_*.jp2"))[0]) as scl_file:
-        #     scl = scl_file.read(1).astype("float32")
-        # with rasterio.open(glob.glob(os.path.join(directories[ind], "IMG_DATA", resolution, "*_TCI_*.jp2"))[0]) as tci_file:
-        #     tci = tci_file.read(1).astype("float32")
-        # with rasterio.open(glob.glob(os.path.join(directories[ind], "IMG_DATA", resolution, "*_WVP_*.jp2"))[0]) as wvp_file:
-        #     wvp = wvp_file.read(1).astype("float32")
         all_coefficients = {}
         for coefficient_name in (const.coefficient_names_r10 if resolution == "R10m" else const.coefficient_names_r20 if resolution == "R20m" else const.coefficient_names_r60):
             filename = glob.glob(os.path.join(directories[ind], "IMG_DATA", resolution, f"*_{coefficient_name}_*.jp2"))
             if not filename:
                 continue
             filename = filename[0]
-            if coefficient_name == "B02":
-                coefficient_name = "BLUE"
-            if coefficient_name == "B03":
-                coefficient_name = "GREEN"
-            if coefficient_name == "B04":
-                coefficient_name = "RED"
-            if coefficient_name == "B08" or coefficient_name == "B8A":
-                coefficient_name = "NIR"
+            coefficient_name = translate_coefficient_name(coefficient_name)
             with rasterio.open(filename) as file:
                 all_coefficients[coefficient_name] = file.read(1).astype("float32")
+
+                # Гармонизация данных
+                offset_coefficients = [
+                    "B01",
+                    "BLUE",
+                    "GREEN",
+                    "RED",
+                    "B05",
+                    "B06",
+                    "B07",
+                    "NIR",
+                    "B09",
+                    "B10",
+                    "B11",
+                    "B12",
+                ]
+                offset = 1000
+                if coefficient_name in offset_coefficients and date >= "2022-01-25":
+                    coefficient_data = np.clip(coefficient_data, offset, 32767) - offset
+
                 file_crs = file.crs
                 file_transform = file.transform
                 file_width = file.width
@@ -113,26 +119,6 @@ def processing(data, callback):
             elif coefficient in all_coefficients:
                 coefficient_data = all_coefficients[coefficient]
             coefficient_path = os.path.join(output, "buffer", date, coefficient + ".tiff")
-
-            # Гармонизация данных
-            offset_coefficients = [
-                "B01",
-                "B02",
-                "B03",
-                "B04",
-                "B05",
-                "B06",
-                "B07",
-                "B08",
-                "B8A",
-                "B09",
-                "B10",
-                "B11",
-                "B12",
-            ]
-            offset = 1000
-            if coefficient in offset_coefficients and date >= "2022-01-25":
-                coefficient_data = np.clip(coefficient_data, offset, 32767) - offset
 
             # Записываем каждый коеффициент в файл
             with rasterio.open(os.path.join(output, "buffer", date, coefficient + "_no_crs" + ".tiff"), "w", driver="GTiff", height=file_height, width=file_width, count=1, dtype="float32", crs=file_crs, transform=file_transform) as coefficient_file:
@@ -204,5 +190,7 @@ def processing(data, callback):
                     data[key] = np.nan
                 rows.append({"x": x, "y": y, **data})
             df = pd.DataFrame(rows, columns=['x', 'y', *sorted(dates)])
-            df = df.loc[:, ~df.columns.duplicated()].copy()
+            if len(df.index) == 0:
+                continue
+            df = df.loc[:, ~df.columns.duplicated()].copy()  # Удаляет повторяющиеся строки
             df.to_csv(os.path.join(output, coefficient, match_fields[field_index] + ".csv"), index=False)
