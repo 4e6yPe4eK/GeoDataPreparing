@@ -95,7 +95,7 @@ def processing(data, callback):
                 ]
                 offset = 1000
                 if coefficient_name in offset_coefficients and date >= "2022-01-25":
-                    coefficient_data = np.clip(coefficient_data, offset, 32767) - offset
+                    all_coefficients[coefficient_name] = np.clip(all_coefficients[coefficient_name], offset, 32767) - offset
 
                 file_crs = file.crs
                 file_transform = file.transform
