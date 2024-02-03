@@ -2,6 +2,7 @@ import re
 import os
 import glob
 import fiona
+import shutil
 import datetime
 import pathlib
 import numpy as np
@@ -226,3 +227,4 @@ def processing(data, callback):
                 continue
             df = df.loc[:, ~df.columns.duplicated()].copy()  # Удаляет повторяющиеся строки
             df.to_csv(os.path.join(output, coefficient, match_fields[field_index] + ".csv"), index=False)
+    shutil.rmtree(os.path.join(output, "buffer"))
