@@ -1,7 +1,7 @@
 import sys
 from PyQt5.QtWidgets import QApplication
 
-from landsat.window import MainWindow
+from sentinel.window import MainWindow
 
 
 if __name__ == "__main__":
