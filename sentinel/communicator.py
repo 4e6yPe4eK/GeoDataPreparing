@@ -69,6 +69,37 @@ def processing(data, callback):
     for ind, date in enumerate(dates):
         pathlib.Path(os.path.join(output, "buffer", date)).mkdir(parents=True, exist_ok=True)
         all_coefficients = {}
+
+        if resolution == "R10m":  # Individual path for resample SCL
+            source_filename = glob.glob(os.path.join(directories[ind], "IMG_DATA", "R20m", f"*_SCL_*.jp2"))
+            if source_filename:
+                source_filename = source_filename[0]
+                with rasterio.open(source_filename) as dataset:
+                    scale_factor_x = 2
+                    scale_factor_y = 2
+
+                    data = dataset.read(
+                        out_shape=(
+                            dataset.count,
+                            int(dataset.height * scale_factor_y),
+                            int(dataset.width * scale_factor_x)
+                        ),
+                        resampling=Resampling.bilinear
+                    )
+
+                    # scale image transform
+                    transform = dataset.transform * dataset.transform.scale(
+                        (1 / scale_factor_x),
+                        (1 / scale_factor_y)
+                    )
+                    file_crs = dataset.crs
+                    file_transform = transform
+                    file_width = dataset.width
+                    file_height = dataset.height
+                    all_coefficients["SCL"] = np.squeeze(data)
+            else:
+                print("R20 SCL not found")
+
         for coefficient_name in (
         const.coefficient_names_r10 if resolution == "R10m" else const.coefficient_names_r20 if resolution == "R20m" else const.coefficient_names_r60):
             filename = glob.glob(os.path.join(directories[ind], "IMG_DATA", resolution, f"*_{coefficient_name}_*.jp2"))
