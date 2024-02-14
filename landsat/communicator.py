@@ -45,7 +45,6 @@ def process_all(data, callback):
     pathlib.Path(os.path.join(data["output"], "buffer")).mkdir(parents=True, exist_ok=True)
     for directory in data["directories"]:
         process_directory(data, directory)
-    shutil.rmtree(os.path.join(data["output"], "buffer"))
 
     # Создаем папки для коэффициентов
     for coefficient in data["coefficients"]:
@@ -56,7 +55,7 @@ def process_all(data, callback):
             continue
         process_field(data, match_fields[field_index], field_shape)
 
-
+    shutil.rmtree(os.path.join(data["output"], "buffer"))
 
 
 def process_directory(data, path):
