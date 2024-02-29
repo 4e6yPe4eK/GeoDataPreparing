@@ -8,7 +8,6 @@ import pathlib
 import numpy as np
 import rasterio
 from rasterio import mask
-import logging
 import pandas as pd
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 
@@ -135,7 +134,8 @@ def processing(data, callback):
                 file_width = file.width
                 file_height = file.height
         for coefficient_ind, coefficient in enumerate(allowed_coefficients):
-            callback((ind * len(allowed_coefficients) + coefficient_ind) * 50 / (len(dates) * len(allowed_coefficients)))
+            callback((ind * len(allowed_coefficients) + coefficient_ind) * 50 / (len(dates) * len(allowed_coefficients)),
+                     callback_type="percent")
             coefficient_data = np.zeros((1, ))
             if coefficient == "NDVI":
                 coefficient_data = (all_coefficients["NIR"] - all_coefficients["RED"]) / (all_coefficients["NIR"] + all_coefficients["RED"])
@@ -182,7 +182,8 @@ def processing(data, callback):
         pathlib.Path(os.path.join(output, coefficient)).mkdir(parents=True, exist_ok=True)
 
     for field_index, field_shape in enumerate(shapes):
-        callback(50 + field_index * 50 // len(shapes))
+        callback(50 + field_index * 50 // len(shapes),
+                 callback_type="percent")
         if field_index not in match_fields or match_fields[field_index] not in allowed_fields:
             continue
         for coefficient in allowed_coefficients:
@@ -216,7 +217,8 @@ def processing(data, callback):
                             full_data[(x, y)] = {}
                         full_data[(x, y)][date] = value
                 except Exception as err:
-                    logging.error(f"field index - {field_index}, field name - {match_fields[field_index]}, Error - {err})")
+                    callback(f"Произошла ошибка! Поле: {match_fields[field_index]}, Ошибка: {err}",
+                             callback_type="error")
             rows = []
             for (x, y), data in full_data.items():
                 for key in set(dates) - set(data.keys()):

@@ -15,10 +15,17 @@ logging.basicConfig(filename="log.log", level=logging.INFO)
 class Worker(QObject):
     finished = pyqtSignal()
     progressChanged = pyqtSignal(int)
+    errorRaised = pyqtSignal(str)
+
+    def callback_function(self, *args, callback_type="percent"):
+        if callback_type == "percent":
+            self.progressChanged.emit(args[0])
+        if callback_type == "error":
+            self.errorRaised.emit(args[0])
 
     def run(self, data):
         self.progressChanged.emit(0)
-        communicator.parse_directories(data, self.progressChanged.emit)
+        communicator.parse_directories(data, self.callback_function)
         self.finished.emit()
 
 
@@ -163,10 +170,9 @@ class MainWindow(QMainWindow):
             worker.moveToThread(self.new_thread)
             self.new_thread.started.connect(partial(worker.run, data))
             worker.finished.connect(self.new_thread.quit)
-            worker.finished.connect(lambda: self.start_button.setText("Начать"))
-            worker.finished.connect(lambda: self.start_button.setEnabled(True))
-            worker.finished.connect(lambda: self.message("Обработка завершена", 3000))
+            worker.finished.connect(self.finished_function)
             worker.progressChanged.connect(self.progress_changed)
+            worker.errorRaised.connect(self.error_raised)
             self.new_thread.finished.connect(worker.deleteLater)
             self.new_thread.finished.connect(self.new_thread.deleteLater)
             self.new_thread.start()
@@ -175,3 +181,16 @@ class MainWindow(QMainWindow):
 
     def progress_changed(self, percent):
         self.message(f"Завершено на {percent}%")
+
+    def error_raised(self, message):
+        logging.error(message)
+        self.error_state = True
+
+    def finished_function(self):
+        self.start_button.setText("Начать")
+        self.start_button.setEnabled(True)
+        if self.error_state:
+            self.message("Обработка завершена с ошибками", 3000)
+            self.error_state = False
+        else:
+            self.message("Обработка завершена", 3000)

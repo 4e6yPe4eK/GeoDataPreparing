@@ -11,8 +11,6 @@ import re
 from rasterio import mask
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 
-from landsat.const import LANDSAT_COEFFICIENT_NAMES
-
 
 def load_shape(filename):
     with fiona.open(filename, "r") as shapefile:
@@ -44,7 +42,11 @@ def process_all(data, callback):
     data["shape"] = (crs, shapes)
     pathlib.Path(os.path.join(data["output"], "buffer")).mkdir(parents=True, exist_ok=True)
     for directory in data["directories"]:
-        process_directory(data, directory)
+        try:
+            process_directory(data, directory, callback)
+        except Exception as err:
+            callback(f"Неизвестная ошибка при обработке директории {directory}! Сообщение: {err}",
+                     callback_type="error")
 
     # Создаем папки для коэффициентов
     for coefficient in data["coefficients"]:
@@ -53,12 +55,16 @@ def process_all(data, callback):
     for field_index, field_shape in enumerate(shapes):
         if field_index not in match_fields or match_fields[field_index] not in data["fields"]:
             continue
-        process_field(data, match_fields[field_index], field_shape)
+        try:
+            process_field(data, match_fields[field_index], field_shape, callback)
+        except Exception as err:
+            callback(f"Неизвестная ошибка при обработке поля {match_fields[field_index]}! Сообщение: {err}",
+                     callback_type="error")
 
     shutil.rmtree(os.path.join(data["output"], "buffer"))
 
 
-def process_directory(data, path):
+def process_directory(data, path, callback):
     output = data["output"]
     crs, shapes = data["shape"]
 
@@ -77,80 +83,84 @@ def process_directory(data, path):
 
     # Запись всех коэффициентов в нужном формате
     for coefficient in data["coefficients"]:
-        if coefficient == "NDVI":
-            red_filename = os.path.join(path, metadata["PRODUCT_CONTENTS"]["FILE_NAME_BAND_4"])
-            nir_filename = os.path.join(path, metadata["PRODUCT_CONTENTS"]["FILE_NAME_BAND_5"])
-            with rasterio.open(red_filename) as red_file:
-                red = red_file.read(1).astype("float32")
-            with rasterio.open(nir_filename) as nir_file:
-                nir = nir_file.read(1).astype("float32")
-                file_crs = nir_file.crs
-                file_transform = nir_file.transform
-                file_width = nir_file.width
-                file_height = nir_file.height
-            coefficient_data = (nir - red) / (nir + red)
-            del red
-            del nir
-        elif coefficient == "EVI":
-            blue_filename = os.path.join(path, metadata["PRODUCT_CONTENTS"]["FILE_NAME_BAND_2"])
-            red_filename = os.path.join(path, metadata["PRODUCT_CONTENTS"]["FILE_NAME_BAND_4"])
-            nir_filename = os.path.join(path, metadata["PRODUCT_CONTENTS"]["FILE_NAME_BAND_5"])
-            with rasterio.open(blue_filename) as blue_file:
-                blue = blue_file.read(1).astype("float32")
-            with rasterio.open(red_filename) as red_file:
-                red = red_file.read(1).astype("float32")
-            with rasterio.open(nir_filename) as nir_file:
-                nir = nir_file.read(1).astype("float32")
-                file_crs = nir_file.crs
-                file_transform = nir_file.transform
-                file_width = nir_file.width
-                file_height = nir_file.height
-            coefficient_data = 2.5 * (nir - red) / (nir + 6 * red - 7.5 * blue + 1)
-            del blue
-            del red
-            del nir
-        else:
-            filename = os.path.join(path, metadata["PRODUCT_CONTENTS"][f"FILE_NAME_{coefficient}"])
-            with rasterio.open(filename) as file:
-                coefficient_data = file.read(1).astype("float32")
-                file_crs = file.crs
-                file_transform = file.transform
-                file_width = file.width
-                file_height = file.height
+        try:
+            if coefficient == "NDVI":
+                red_filename = os.path.join(path, metadata["PRODUCT_CONTENTS"]["FILE_NAME_BAND_4"])
+                nir_filename = os.path.join(path, metadata["PRODUCT_CONTENTS"]["FILE_NAME_BAND_5"])
+                with rasterio.open(red_filename) as red_file:
+                    red = red_file.read(1).astype("float32")
+                with rasterio.open(nir_filename) as nir_file:
+                    nir = nir_file.read(1).astype("float32")
+                    file_crs = nir_file.crs
+                    file_transform = nir_file.transform
+                    file_width = nir_file.width
+                    file_height = nir_file.height
+                coefficient_data = (nir - red) / (nir + red)
+                del red
+                del nir
+            elif coefficient == "EVI":
+                blue_filename = os.path.join(path, metadata["PRODUCT_CONTENTS"]["FILE_NAME_BAND_2"])
+                red_filename = os.path.join(path, metadata["PRODUCT_CONTENTS"]["FILE_NAME_BAND_4"])
+                nir_filename = os.path.join(path, metadata["PRODUCT_CONTENTS"]["FILE_NAME_BAND_5"])
+                with rasterio.open(blue_filename) as blue_file:
+                    blue = blue_file.read(1).astype("float32")
+                with rasterio.open(red_filename) as red_file:
+                    red = red_file.read(1).astype("float32")
+                with rasterio.open(nir_filename) as nir_file:
+                    nir = nir_file.read(1).astype("float32")
+                    file_crs = nir_file.crs
+                    file_transform = nir_file.transform
+                    file_width = nir_file.width
+                    file_height = nir_file.height
+                coefficient_data = 2.5 * (nir - red) / (nir + 6 * red - 7.5 * blue + 1)
+                del blue
+                del red
+                del nir
+            else:
+                filename = os.path.join(path, metadata["PRODUCT_CONTENTS"][f"FILE_NAME_{coefficient}"])
+                with rasterio.open(filename) as file:
+                    coefficient_data = file.read(1).astype("float32")
+                    file_crs = file.crs
+                    file_transform = file.transform
+                    file_width = file.width
+                    file_height = file.height
 
-        coefficient_path_no_crs = os.path.join(output, "buffer", date, coefficient + "_no_crs" + ".tiff")
-        coefficient_path = os.path.join(output, "buffer", date, coefficient + ".tiff")
+            coefficient_path_no_crs = os.path.join(output, "buffer", date, coefficient + "_no_crs" + ".tiff")
+            coefficient_path = os.path.join(output, "buffer", date, coefficient + ".tiff")
 
-        # Записываем каждый коеффициент в файл
-        with rasterio.open(coefficient_path_no_crs, "w", driver="GTiff",
-                           height=file_height, width=file_width, count=1, dtype="float32", crs=file_crs,
-                           transform=file_transform) as coefficient_file:
-            coefficient_file.write(coefficient_data, 1)
+            # Записываем каждый коеффициент в файл
+            with rasterio.open(coefficient_path_no_crs, "w", driver="GTiff",
+                               height=file_height, width=file_width, count=1, dtype="float32", crs=file_crs,
+                               transform=file_transform) as coefficient_file:
+                coefficient_file.write(coefficient_data, 1)
 
-        # Меняем координатную систему
-        with rasterio.open(coefficient_path_no_crs) as coefficient_file:
-            transform, width, height = calculate_default_transform(coefficient_file.crs, crs,
-                                                                   coefficient_file.width,
-                                                                   coefficient_file.height,
-                                                                   *coefficient_file.bounds)
-            kwargs = coefficient_file.meta.copy()
-            kwargs.update({"crs": crs, "transform": transform, "width": width, "height": height})
-            with rasterio.open(coefficient_path, "w", **kwargs) as dst:
-                for i in range(1, coefficient_file.count + 1):
-                    reproject(
-                        source=rasterio.band(coefficient_file, i),
-                        destination=rasterio.band(dst, i),
-                        src_transform=coefficient_file.transform,
-                        src_crs=coefficient_file.crs,
-                        dst_transform=transform,
-                        dst_crs=crs,
-                        resampling=Resampling.nearest)
+            # Меняем координатную систему
+            with rasterio.open(coefficient_path_no_crs) as coefficient_file:
+                transform, width, height = calculate_default_transform(coefficient_file.crs, crs,
+                                                                       coefficient_file.width,
+                                                                       coefficient_file.height,
+                                                                       *coefficient_file.bounds)
+                kwargs = coefficient_file.meta.copy()
+                kwargs.update({"crs": crs, "transform": transform, "width": width, "height": height})
+                with rasterio.open(coefficient_path, "w", **kwargs) as dst:
+                    for i in range(1, coefficient_file.count + 1):
+                        reproject(
+                            source=rasterio.band(coefficient_file, i),
+                            destination=rasterio.band(dst, i),
+                            src_transform=coefficient_file.transform,
+                            src_crs=coefficient_file.crs,
+                            dst_transform=transform,
+                            dst_crs=crs,
+                            resampling=Resampling.nearest)
 
-        # Удаляем файл без координатной системы
-        os.remove(coefficient_path_no_crs)
+            # Удаляем файл без координатной системы
+            os.remove(coefficient_path_no_crs)
+        except Exception as err:
+            callback(f"Неизвестная ошибка при обработке коэффициента {coefficient}! Сообщение: {err}",
+                     callback_type="error")
 
 
-def process_field(data, field_name, field_shape):
+def process_field(data, field_name, field_shape, callback):
     output = data["output"]
 
     for coefficient in data["coefficients"]:
@@ -162,7 +172,12 @@ def process_field(data, field_name, field_shape):
             coefficient_path = os.path.join(directory, coefficient + ".tiff")
             field_path = os.path.join(output, "buffer", f"{field_name}_{date}_{coefficient}.tiff")
             with rasterio.open(coefficient_path) as coefficient_file:
-                out_image, out_transform = mask.mask(coefficient_file, [field_shape], crop=True)
+                try:
+                    out_image, out_transform = mask.mask(coefficient_file, [field_shape], crop=True)
+                except ValueError:
+                    callback(f"Поле {field_name} не найдено! Путь: {coefficient_path}",
+                             callback_type="error")
+                    continue
                 out_meta = coefficient_file.meta.copy()
                 out_meta.update({"driver": "GTiff", "height": out_image.shape[1], "width": out_image.shape[2],
                                  "transform": out_transform})
