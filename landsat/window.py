@@ -32,10 +32,11 @@ class Worker(QObject):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Geo")
+        self.setWindowTitle("Landsat")
         self.resize(800, 600)
         self.message("", 1)
         self.new_thread = None
+        self.error_state = False
 
         self.widget = QWidget(self)
         self.setCentralWidget(self.widget)

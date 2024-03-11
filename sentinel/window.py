@@ -33,7 +33,7 @@ class Worker(QObject):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Geo")
+        self.setWindowTitle("Sentinel")
         self.resize(800, 600)
         self.message("", 1)
         self.new_thread = None
