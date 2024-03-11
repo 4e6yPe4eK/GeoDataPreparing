@@ -48,10 +48,6 @@ def process_all(data, callback):
             callback(f"Неизвестная ошибка при обработке директории {directory}! Сообщение: {err}",
                      callback_type="error")
 
-    # Создаем папки для коэффициентов
-    for coefficient in data["coefficients"]:
-        pathlib.Path(os.path.join(data["output"], coefficient)).mkdir(parents=True, exist_ok=True)
-
     for field_index, field_shape in enumerate(shapes):
         if field_index not in match_fields or match_fields[field_index] not in data["fields"]:
             continue
@@ -73,8 +69,6 @@ def process_directory(data, path, callback):
         metadata = json.load(metadata_file)["LANDSAT_METADATA_FILE"]
 
     date = metadata["IMAGE_ATTRIBUTES"]["DATE_ACQUIRED"]
-    pathlib.Path(os.path.join(output, "buffer", date)).mkdir(parents=True, exist_ok=True)
-
     pathlib.Path(os.path.join(output, "buffer", date)).mkdir(parents=True, exist_ok=True)
 
     # Чтение всех коэффициентов

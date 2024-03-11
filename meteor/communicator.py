@@ -50,9 +50,6 @@ def process_all(data, callback):
             callback(f"Неизвестная ошибка при обработке директории {directory}! Сообщение: {err}",
                      callback_type="error")
     callback(50, callback_type="percent")
-    # Создаем папки для коэффициентов
-    for coefficient in data["coefficients"]:
-        pathlib.Path(os.path.join(data["output"], coefficient)).mkdir(parents=True, exist_ok=True)
 
     for field_index, field_shape in enumerate(shapes):
         callback(field_index // len(shapes), callback_type="percent")
@@ -82,7 +79,6 @@ def process_directory(data, path, callback):
 
     for date_ind, date in enumerate(dates):
         callback(50 * date_ind // len(dates), callback_type="percent")
-        pathlib.Path(os.path.join(output, "buffer", date)).mkdir(parents=True, exist_ok=True)
         pathlib.Path(os.path.join(output, "buffer", date)).mkdir(parents=True, exist_ok=True)
 
         # Запись всех коэффициентов в нужном формате
