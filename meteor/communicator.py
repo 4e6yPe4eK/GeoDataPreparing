@@ -26,9 +26,7 @@ def parse_directories(data, callback):
     all_directories = glob.glob(os.path.join(base_directory, "*"))
     finded_directories = []
     for directory in all_directories:
-        directory_name = os.path.basename(directory)
-        if re.fullmatch(r"\d{14}_.*", directory_name):
-            finded_directories.append(directory)
+        finded_directories.append(directory)
     data["directories"] = finded_directories
     process_all(data, callback)
 
@@ -43,16 +41,16 @@ def process_all(data, callback):
     crs, shapes = load_shape(data["shape"])
     data["shape"] = (crs, shapes)
     pathlib.Path(os.path.join(data["output"], "buffer")).mkdir(parents=True, exist_ok=True)
-    for directory in data["directories"]:
+    for dir_ind, directory in enumerate(data["directories"]):
+        callback(50 * dir_ind // len(data["directories"]), callback_type="percent")
         try:
             process_directory(data, directory, callback)
         except Exception as err:
             callback(f"Неизвестная ошибка при обработке директории {directory}! Сообщение: {err}",
                      callback_type="error")
-    callback(50, callback_type="percent")
 
     for field_index, field_shape in enumerate(shapes):
-        callback(field_index // len(shapes), callback_type="percent")
+        callback(50 + 50 * field_index // len(shapes), callback_type="percent")
         if field_index not in match_fields or match_fields[field_index] not in data["fields"]:
             continue
         try:
@@ -78,7 +76,6 @@ def process_directory(data, path, callback):
         dates[date][coefficient] = file_path
 
     for date_ind, date in enumerate(dates):
-        callback(50 * date_ind // len(dates), callback_type="percent")
         pathlib.Path(os.path.join(output, "buffer", date)).mkdir(parents=True, exist_ok=True)
 
         # Запись всех коэффициентов в нужном формате
@@ -95,6 +92,8 @@ def process_directory(data, path, callback):
                         file_transform = nir_file.transform
                         file_width = nir_file.width
                         file_height = nir_file.height
+                    nir[nir == 0] = np.nan
+                    red[red == 0] = np.nan
                     coefficient_data = (nir - red) / (nir + red)
                     del red
                     del nir
