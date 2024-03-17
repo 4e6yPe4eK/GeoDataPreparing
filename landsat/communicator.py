@@ -49,6 +49,7 @@ def process_all(data, callback):
                      callback_type="error")
 
     for field_index, field_shape in enumerate(shapes):
+        callback(50 + 50 * field_index // len(shapes), callback_type="percent")
         if field_index not in match_fields or match_fields[field_index] not in data["fields"]:
             continue
         try:
