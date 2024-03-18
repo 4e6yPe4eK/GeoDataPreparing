@@ -232,5 +232,5 @@ def processing(data, callback):
                 df = pd.concat([pd.read_csv(filename), df])
             df = df.loc[:, ~df.columns.duplicated()].copy()  # Удаляет повторяющиеся столбцы
             df = df.drop_duplicates(subset=['x', 'y'])  # Удаляет повторяющиеся строки(совпадающие координаты)
-            df.to_csv(filename, index=False)
+            df.to_csv(filename, index=False, sep=';')
     shutil.rmtree(os.path.join(output, "buffer"))
