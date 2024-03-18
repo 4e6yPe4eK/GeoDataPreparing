@@ -204,9 +204,10 @@ def process_field(data, field_name, field_shape, callback):
         df = pd.DataFrame(rows, columns=['x', 'y', *sorted(dates)])
         if len(df.index) == 0:
             continue
+        pathlib.Path(os.path.join(output, coefficient)).mkdir(parents=True, exist_ok=True)
         filename = os.path.join(output, coefficient, field_name + ".csv")
         if os.path.isfile(filename):
             df = pd.concat([pd.read_csv(filename), df])
         df = df.loc[:, ~df.columns.duplicated()].copy()  # Удаляет повторяющиеся столбцы
         df = df.drop_duplicates(subset=['x', 'y'])  # Удаляет повторяющиеся строки(совпадающие координаты)
-        df.to_csv(filename, index=False)
+        df.to_csv(filename, index=False, sep=';')
