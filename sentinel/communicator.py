@@ -229,8 +229,8 @@ def processing(data, callback):
                 continue
             filename = os.path.join(output, coefficient, match_fields[field_index] + ".csv")
             if os.path.isfile(filename):
-                df = pd.concat([pd.read_csv(filename), df])
+                df = pd.concat([pd.read_csv(filename, sep=const.DELIMITER), df])
             df = df.loc[:, ~df.columns.duplicated()].copy()  # Удаляет повторяющиеся столбцы
             df = df.drop_duplicates(subset=['x', 'y'])  # Удаляет повторяющиеся строки(совпадающие координаты)
-            df.to_csv(filename, index=False, sep=';')
+            df.to_csv(filename, index=False, sep=const.DELIMITER)
     shutil.rmtree(os.path.join(output, "buffer"))
