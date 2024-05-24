@@ -1,6 +1,8 @@
 import re
 import os
 import glob
+import traceback
+
 import fiona
 import shutil
 import datetime
@@ -167,7 +169,7 @@ def process_directory(data, path, callback):
                 file_crs, file_transform, file_width, file_height, nir = \
                     load_coefficient(path, resolution, "B08", date) or load_coefficient(path, resolution, "B8A", date)
                 if blue is None:
-                    callback(f"Can't find B04, path: {path}", callback_type="error")
+                    callback(f"Can't find B02, path: {path}", callback_type="error")
                     continue
                 if red is None:
                     callback(f"Can't find B04, path: {path}", callback_type="error")
@@ -232,18 +234,23 @@ def process_field(data, field_name, field_shape, callback):
             dates.append(date)
             coefficient_path = os.path.join(directory, coefficient + ".tiff")
             field_path = os.path.join(output, "buffer", f"{field_name}_{date}_{coefficient}.tiff")
-            with rasterio.open(coefficient_path) as coefficient_file:
-                try:
-                    out_image, out_transform = mask.mask(coefficient_file, [field_shape], crop=True)
-                except ValueError:
-                    callback(f"Field {field_name} not found, path: {coefficient_path}",
-                             callback_type="error")
-                    continue
-                out_meta = coefficient_file.meta.copy()
-                out_meta.update({"driver": "GTiff", "height": out_image.shape[1], "width": out_image.shape[2],
-                                 "transform": out_transform})
-                with rasterio.open(field_path, "w", **out_meta) as dest:
-                    dest.write(out_image)
+            try:
+                with rasterio.open(coefficient_path) as coefficient_file:
+                    try:
+                        out_image, out_transform = mask.mask(coefficient_file, [field_shape], crop=True)
+                    except ValueError:
+                        callback(f"Field {field_name} not found, path: {coefficient_path}",
+                                 callback_type="error")
+                        continue
+                    out_meta = coefficient_file.meta.copy()
+                    out_meta.update({"driver": "GTiff", "height": out_image.shape[1], "width": out_image.shape[2],
+                                     "transform": out_transform})
+                    with rasterio.open(field_path, "w", **out_meta) as dest:
+                        dest.write(out_image)
+            except rasterio.errors.RasterioIOError as e:
+                dates.pop()
+                callback(f"Error with field {field_name} date {date}, error: {e}", callback_type="error")
+                continue
 
             with rasterio.open(field_path) as field_file:
                 # no_data = field_file.nodata
