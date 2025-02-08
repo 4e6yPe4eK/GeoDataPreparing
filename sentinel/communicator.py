@@ -275,11 +275,13 @@ def process_field(data, field_name, field_shape, callback):
                 data[key] = np.nan
             rows.append({"x": x, "y": y, **data})
         df = pd.DataFrame(rows, columns=['x', 'y', *sorted(dates)])
+        df['x'] = df['x'].round(6)
+        df['y'] = df['y'].round(6)
         if len(df.index) == 0:
             continue
         pathlib.Path(os.path.join(output, coefficient)).mkdir(parents=True, exist_ok=True)
         filename = os.path.join(output, coefficient, field_name + ".csv")
         if os.path.isfile(filename):
-            df = pd.merge(df, pd.read_csv(filename, sep=const.DELIMITER), on=["x", "y"])
+            df = pd.merge(df, pd.read_csv(filename, sep=const.DELIMITER), on=["x", "y"], how="outer")
         df = df.loc[:, ~df.columns.duplicated()].copy()  # Удаляет повторяющиеся столбцы
         df.to_csv(filename, index=False, sep=const.DELIMITER)
