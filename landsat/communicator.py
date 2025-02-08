@@ -9,7 +9,7 @@ import pathlib
 import rasterio
 import re
 from rasterio import mask
-from rasterio.warp import calculate_default_transform, reproject, Resampling
+from rasterio.warp import calculate_default_transform, reproject, Resampling, aligned_target
 
 from landsat import const
 
@@ -60,31 +60,20 @@ def process_all(data, callback):
     shutil.rmtree(os.path.join(data["output"], "buffer"))
 
 
-def reproj_match(infile, match, outfile):
-    """Reproject a file to match the shape and projection of existing raster.
-
-    Parameters
-    ----------
-    infile : (string) path to input file to reproject
-    match : (string) path to raster with desired shape and projection
-    outfile : (string) path to output file tif
-    """
+def reproj_match(infile, dst_crs, outfile):
     # open input
     with rasterio.open(infile) as src:
         src_transform = src.transform
 
-        # open input to match
-        with rasterio.open(match) as match:
-            dst_crs = match.crs
-
-            # calculate the output transform matrix
-            dst_transform, dst_width, dst_height = calculate_default_transform(
-                src.crs,  # input CRS
-                dst_crs,  # output CRS
-                match.width,  # input width
-                match.height,  # input height
-                *match.bounds,  # unpacks input outer boundaries (left, bottom, right, top)
-            )
+        # calculate the output transform matrix
+        dst_transform, dst_width, dst_height = calculate_default_transform(
+            src.crs,  # input CRS
+            dst_crs,  # output CRS
+            src.width,  # input width
+            src.height,  # input height
+            *src.bounds,  # unpacks input outer boundaries (left, bottom, right, top)
+        )
+        dst_transform, dst_width, dst_height = aligned_target(dst_transform, dst_width, dst_height, 0.00054)
 
         # set properties for output
         dst_kwargs = src.meta.copy()
@@ -104,7 +93,7 @@ def reproj_match(infile, match, outfile):
                     src_crs=src.crs,
                     dst_transform=dst_transform,
                     dst_crs=dst_crs,
-                    resampling=Resampling.nearest)
+                    resampling=Resampling.bilinear)
 
 
 def coregister_all(data, callback):
@@ -112,12 +101,11 @@ def coregister_all(data, callback):
         full_data = {}
         dates = []
         pathes = glob.glob(os.path.join(data["output"], "buffer", "*"))
-        standard = os.path.join(pathes[0], coefficient + ".tiff")
-        for directory in pathes[1:]:
+        for directory in pathes:
             coefficient_path = os.path.join(directory, coefficient + ".tiff")
             coefficient_path_old = coefficient_path + ".old"
             os.rename(coefficient_path, coefficient_path_old)
-            reproj_match(coefficient_path_old, standard, coefficient_path)
+            reproj_match(coefficient_path_old, rasterio.crs.CRS.from_epsg(4326), coefficient_path)
             os.remove(coefficient_path_old)
 
 
