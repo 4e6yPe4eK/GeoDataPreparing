@@ -123,8 +123,8 @@ class MainWindow(QMainWindow):
         self.match_data = {}
         wb: openpyxl.workbook.Workbook = openpyxl.load_workbook(match_path, read_only=True)
         sheet = wb.active
-        for row in range(1, sheet.max_row + 1):
-            self.match_data[int(sheet.cell(row=row, column=1).value)] = str(sheet.cell(row=row, column=2).value)
+        for row in sheet.rows:
+            self.match_data[int(row[0].value)] = str(row[1].value)
 
     def message(self, text, time=0):
         self.statusBar().showMessage(text, time)
