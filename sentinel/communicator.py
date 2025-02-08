@@ -262,7 +262,7 @@ def process_field(data, field_name, field_shape, callback):
                     for y in range(y_size):
                         if val[x, y] != no_data:
                             data.append((*field_file.xy(x, y), val[x, y]))
-            # Удаляем файл
+            # Удаляем файл обязательно, лишние файлы ломают
             os.remove(os.path.join(output, "buffer", f"{field_name}_{date}_{coefficient}.tiff"))
             for x, y, value in data:
                 if (x, y) not in full_data:
@@ -280,7 +280,6 @@ def process_field(data, field_name, field_shape, callback):
         pathlib.Path(os.path.join(output, coefficient)).mkdir(parents=True, exist_ok=True)
         filename = os.path.join(output, coefficient, field_name + ".csv")
         if os.path.isfile(filename):
-            df = pd.concat([pd.read_csv(filename, sep=const.DELIMITER), df])
+            df = pd.merge(df, pd.read_csv(filename, sep=const.DELIMITER), on=["x", "y"])
         df = df.loc[:, ~df.columns.duplicated()].copy()  # Удаляет повторяющиеся столбцы
-        df = df.drop_duplicates(subset=['x', 'y'])  # Удаляет повторяющиеся строки(совпадающие координаты)
         df.to_csv(filename, index=False, sep=const.DELIMITER)
