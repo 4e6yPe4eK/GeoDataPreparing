@@ -11,7 +11,7 @@ import numpy as np
 import rasterio
 from rasterio import mask
 import pandas as pd
-from rasterio.warp import calculate_default_transform, reproject, Resampling
+from rasterio.warp import calculate_default_transform, reproject, Resampling, aligned_target
 
 from sentinel import const
 
@@ -55,6 +55,8 @@ def process_all(data, callback):
             callback(f"Unknown error with directory: {directory}, error: {err}",
                      callback_type="error")
 
+    coregister_all(data, callback)
+
     for field_index, field_shape in enumerate(shapes):
         callback(50 + 50 * field_index // len(shapes), callback_type="percent")
         if field_index not in match_fields or match_fields[field_index] not in data["fields"]:
@@ -66,6 +68,53 @@ def process_all(data, callback):
                      callback_type="error")
 
     shutil.rmtree(os.path.join(data["output"], "buffer"))
+
+
+def reproj_match(infile, dst_crs, expected_resolution, outfile):
+    # open input
+    with rasterio.open(infile) as src:
+        src_transform = src.transform
+
+        # calculate the output transform matrix
+        dst_transform, dst_width, dst_height = calculate_default_transform(
+            src.crs,  # input CRS
+            dst_crs,  # output CRS
+            src.width,  # input width
+            src.height,  # input height
+            *src.bounds,  # unpacks input outer boundaries (left, bottom, right, top)
+        )
+        dst_transform, dst_width, dst_height = aligned_target(dst_transform, dst_width, dst_height, expected_resolution * 9 / 1000000)
+
+        # set properties for output
+        dst_kwargs = src.meta.copy()
+        dst_kwargs.update({"crs": dst_crs,
+                           "transform": dst_transform,
+                           "width": dst_width,
+                           "height": dst_height,
+                           "nodata": 0})
+        # open output
+        with rasterio.open(outfile, "w", **dst_kwargs) as dst:
+            # iterate through bands and write using reproject function
+            for i in range(1, src.count + 1):
+                reproject(
+                    source=rasterio.band(src, i),
+                    destination=rasterio.band(dst, i),
+                    src_transform=src.transform,
+                    src_crs=src.crs,
+                    dst_transform=dst_transform,
+                    dst_crs=dst_crs,
+                    resampling=Resampling.bilinear)
+
+
+def coregister_all(data, callback):
+    for coefficient in data["coefficients"]:
+        pathes = glob.glob(os.path.join(data["output"], "buffer", "*"))
+        for directory in pathes:
+            coefficient_path = os.path.join(directory, coefficient + ".tiff")
+            coefficient_path_old = coefficient_path + ".old"
+            os.rename(coefficient_path, coefficient_path_old)
+            reproj_match(coefficient_path_old, rasterio.crs.CRS.from_epsg(4326), data["expected_resolution"], coefficient_path)
+            os.remove(coefficient_path_old)
 
 
 def load_r10_scl(path):
@@ -214,7 +263,7 @@ def process_directory(data, path, callback):
                             src_crs=coefficient_file.crs,
                             dst_transform=transform,
                             dst_crs=crs,
-                            resampling=Resampling.nearest)
+                            resampling=Resampling.bilinear)
 
             # Удаляем файл без координатной системы
             os.remove(coefficient_path_no_crs)
