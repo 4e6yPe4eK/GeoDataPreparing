@@ -258,7 +258,7 @@ def process_field(data, field_name, field_shape, callback):
                 val : np.ndarray = field_file.read(1, masked=False)
                 x_size, y_size = field_file.shape
                 x_points, y_points = np.meshgrid(np.arange(x_size), np.arange(y_size))
-                x_coords, y_coords = field_file.xy(x_points, y_points)
+                x_coords, y_coords = field_file.xy(x_points.flatten(), y_points.flatten())
                 data_mask = np.where(val.flatten() != no_data)
                 data = np.array([x_coords, y_coords, val.flatten()]).T[data_mask]
             # Удаляем файл обязательно, лишние файлы ломают
