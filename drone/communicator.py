@@ -7,7 +7,7 @@ import pandas as pd
 import pathlib
 import rasterio
 from rasterio import mask
-from rasterio.warp import calculate_default_transform, reproject, Resampling
+from rasterio.warp import calculate_default_transform, reproject, Resampling, aligned_target
 
 from drone import const
 
@@ -32,32 +32,20 @@ def process_all(data, callback):
     process_field(data, str(data["index"]), shapes[data["index"]], callback)
 
 
-def reproj_match_rescale(infile, match, outfile, factor=1):
-    """Reproject a file to match the shape and projection of existing raster.
-
-    Parameters
-    ----------
-    infile : (string) path to input file to reproject
-    match : (string) path to raster with desired shape and projection
-    outfile : (string) path to output file tif
-    factor: (float) scaling factor
-    """
+def reproj_match(infile, dst_crs, expected_resolution, outfile):
     # open input
     with rasterio.open(infile) as src:
         src_transform = src.transform
 
-        # open input to match
-        with rasterio.open(match) as match:
-            dst_crs = match.crs
-
-            # calculate the output transform matrix
-            dst_transform, dst_width, dst_height = calculate_default_transform(
-                src.crs,  # input CRS
-                dst_crs,  # output CRS
-                match.width,  # input width
-                match.height,  # input height
-                *match.bounds,  # unpacks input outer boundaries (left, bottom, right, top)
-            )
+        # calculate the output transform matrix
+        dst_transform, dst_width, dst_height = calculate_default_transform(
+            src.crs,  # input CRS
+            dst_crs,  # output CRS
+            src.width,  # input width
+            src.height,  # input height
+            *src.bounds,  # unpacks input outer boundaries (left, bottom, right, top)
+        )
+        dst_transform, dst_width, dst_height = aligned_target(dst_transform, dst_width, dst_height, expected_resolution * 9 / 1000000)
 
         # set properties for output
         dst_kwargs = src.meta.copy()
@@ -77,49 +65,20 @@ def reproj_match_rescale(infile, match, outfile, factor=1):
                     src_crs=src.crs,
                     dst_transform=dst_transform,
                     dst_crs=dst_crs,
-                    resampling=Resampling.nearest)
-    rescale(outfile, factor)
-
-
-def rescale(path, factor):
-    with rasterio.open(path) as dataset:
-        data = dataset.read(
-            out_shape=(
-                dataset.count,
-                int(dataset.height * factor),
-                int(dataset.width * factor)
-            ),
-            resampling=Resampling.bilinear
-        )
-
-        transform = dataset.transform * dataset.transform.scale(
-            (1 / factor),
-            (1 / factor)
-        )
-
-        file_crs = dataset.crs
-        file_transform = transform
-        file_width = int(dataset.width * factor)
-        file_height = int(dataset.height * factor)
-        result = np.squeeze(data)
-        kwargs = dataset.meta.copy()
-    kwargs.update({
-        "crs": file_crs,
-        "transform": file_transform,
-        "width": file_width,
-        "height": file_height
-    })
-    with rasterio.open(path, "w", **kwargs) as write_file:
-        write_file.write(result, 1)
+                    resampling=Resampling.bilinear)
 
 
 def coregister_all(data, callback):
-    pathes = glob.glob(os.path.join(data["directory"], "*"))
-    standard = pathes[0]
-    for ind, filename in enumerate(pathes):
-        callback(int(50 * ind / len(pathes)))
-        out_filename = os.path.join(data["output"], "buffer", os.path.basename(filename))
-        reproj_match_rescale(filename, standard, out_filename, data["scale"])
+    for coefficient in data["coefficients"]:
+        full_data = {}
+        dates = []
+        pathes = glob.glob(os.path.join(data["output"], "buffer", "*"))
+        for directory in pathes:
+            coefficient_path = os.path.join(directory, coefficient + ".tiff")
+            coefficient_path_old = coefficient_path + ".old"
+            os.rename(coefficient_path, coefficient_path_old)
+            reproj_match(coefficient_path_old, rasterio.crs.CRS.from_epsg(4326), data["expected_resolution"], coefficient_path)
+            os.remove(coefficient_path_old)
 
 
 def process_field(data, field_name, field_shape, callback):

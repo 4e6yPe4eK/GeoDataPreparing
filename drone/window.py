@@ -4,7 +4,7 @@ from functools import partial
 import openpyxl
 from PyQt5.QtCore import QThread, QObject, QLocale, pyqtSignal
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QPushButton, QGridLayout, QLineEdit,
-                             QFileDialog)
+                             QFileDialog, QLabel, QSpinBox)
 from PyQt5.QtGui import QDoubleValidator, QIntValidator
 
 from drone import communicator, const
@@ -74,12 +74,14 @@ class MainWindow(QMainWindow):
         self.index_line.setValidator(QIntValidator())
         self.layout.addWidget(self.index_line, 4, 0, 1, 2)
 
-        self.scale_line = QLineEdit(self.widget)
-        self.scale_line.setPlaceholderText("Коэффициент масштабирования")
-        validator = QDoubleValidator()
-        validator.setLocale(QLocale("en-US"))
-        self.scale_line.setValidator(validator)
-        self.layout.addWidget(self.scale_line, 5, 0, 1, 2)
+        self.expected_resolution_label = QLabel(self.widget)
+        self.expected_resolution_label.setText("Ожидаемое разрешение в метрах")
+        self.layout.addWidget(self.expected_resolution_label, 5, 0, 1, 1)
+        self.expected_resolution_line = QSpinBox(self.widget)
+        self.expected_resolution_line.setRange(1, 1000)
+        self.expected_resolution_line.setValue(30)
+        self.expected_resolution_line.setSingleStep(10)
+        self.layout.addWidget(self.expected_resolution_line, 5, 1, 1, 1)
 
         self.start_button = QPushButton("Начать", self.widget)
         self.start_button.clicked.connect(self.start_button_clicked)
@@ -105,7 +107,7 @@ class MainWindow(QMainWindow):
         shape = self.shape_line.text()
         output = self.output_line.text()
         index = self.index_line.text()
-        scale = self.scale_line.text()
+        expected_resolution = self.expected_resolution_line.value()
         if directory == "":
             self.message("Ошибка: папка с исходными данными не выбрана", 3000)
         elif shape == "":
@@ -114,15 +116,13 @@ class MainWindow(QMainWindow):
             self.message("Ошибка: папка для сохранения не выбрана", 3000)
         elif not index or index == '-':
             self.message("Ошибка: индекс не выбран", 3000)
-        elif not scale or scale == '-':
-            self.message("Ошибка: индекс не выбран", 3000)
         else:
             data = {
                 "directory": directory,
                 "shape": shape,
                 "output": output,
                 "index": int(index),
-                "scale": float(scale)
+                "expected_resolution": expected_resolution,
             }
             self.new_thread = QThread()
             worker = Worker()
