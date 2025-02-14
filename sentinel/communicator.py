@@ -237,36 +237,13 @@ def process_directory(data, path, callback):
                     callback(f"Can't find {coefficient}, path: {path}", callback_type="error")
                     continue
 
-            coefficient_path_no_crs = os.path.join(output, "buffer", date, coefficient + "_no_crs" + ".tiff")
             coefficient_path = os.path.join(output, "buffer", date, coefficient + ".tiff")
 
             # Записываем каждый коеффициент в файл
-            with rasterio.open(coefficient_path_no_crs, "w", driver="GTiff",
+            with rasterio.open(coefficient_path, "w", driver="GTiff",
                                height=file_height, width=file_width, count=1, dtype="float32", crs=file_crs,
                                transform=file_transform) as coefficient_file:
                 coefficient_file.write(coefficient_data, 1)
-
-            # Меняем координатную систему
-            with rasterio.open(coefficient_path_no_crs) as coefficient_file:
-                transform, width, height = calculate_default_transform(coefficient_file.crs, crs,
-                                                                       coefficient_file.width,
-                                                                       coefficient_file.height,
-                                                                       *coefficient_file.bounds)
-                kwargs = coefficient_file.meta.copy()
-                kwargs.update({"crs": crs, "transform": transform, "width": width, "height": height})
-                with rasterio.open(coefficient_path, "w", **kwargs) as dst:
-                    for i in range(1, coefficient_file.count + 1):
-                        reproject(
-                            source=rasterio.band(coefficient_file, i),
-                            destination=rasterio.band(dst, i),
-                            src_transform=coefficient_file.transform,
-                            src_crs=coefficient_file.crs,
-                            dst_transform=transform,
-                            dst_crs=crs,
-                            resampling=Resampling.bilinear)
-
-            # Удаляем файл без координатной системы
-            os.remove(coefficient_path_no_crs)
         except Exception as err:
             callback(f"Unknown error with coefficient {coefficient}, error: {err}",
                      callback_type="error")
