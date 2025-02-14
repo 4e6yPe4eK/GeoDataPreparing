@@ -135,7 +135,7 @@ def process_directory(data, path, callback):
                                 src_crs=coefficient_file.crs,
                                 dst_transform=transform,
                                 dst_crs=crs,
-                                resampling=Resampling.nearest)
+                                resampling=Resampling.bilinear)
 
                 # Удаляем файл без координатной системы
                 os.remove(coefficient_path_no_crs)
@@ -144,7 +144,7 @@ def process_directory(data, path, callback):
                          callback_type="error")
 
 
-def reproj_match(infile, dst_crs, outfile):
+def reproj_match(infile, dst_crs, expected_resolution, outfile):
     # open input
     with rasterio.open(infile) as src:
         src_transform = src.transform
@@ -157,7 +157,7 @@ def reproj_match(infile, dst_crs, outfile):
             src.height,  # input height
             *src.bounds,  # unpacks input outer boundaries (left, bottom, right, top)
         )
-        dst_transform, dst_width, dst_height = aligned_target(dst_transform, dst_width, dst_height, 0.00054)
+        dst_transform, dst_width, dst_height = aligned_target(dst_transform, dst_width, dst_height, expected_resolution * 9 / 1000000)
 
         # set properties for output
         dst_kwargs = src.meta.copy()
@@ -182,14 +182,12 @@ def reproj_match(infile, dst_crs, outfile):
 
 def coregister_all(data, callback):
     for coefficient in data["coefficients"]:
-        full_data = {}
-        dates = []
         pathes = glob.glob(os.path.join(data["output"], "buffer", "*"))
         for directory in pathes:
             coefficient_path = os.path.join(directory, coefficient + ".tiff")
             coefficient_path_old = coefficient_path + ".old"
             os.rename(coefficient_path, coefficient_path_old)
-            reproj_match(coefficient_path_old, rasterio.crs.CRS.from_epsg(4326), coefficient_path)
+            reproj_match(coefficient_path_old, rasterio.crs.CRS.from_epsg(4326), data["expected_resolution"], coefficient_path)
             os.remove(coefficient_path_old)
 
 

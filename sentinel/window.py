@@ -1,6 +1,6 @@
 import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QPushButton, QGridLayout, QLineEdit,
-                             QFileDialog, QHBoxLayout, QRadioButton, QButtonGroup)
+                             QFileDialog, QHBoxLayout, QRadioButton, QButtonGroup, QSpinBox, QLabel)
 from PyQt5.QtCore import QThread, QObject, pyqtSignal
 import openpyxl
 from widgets.checkboxlistwidget import CheckboxListWidget
@@ -99,8 +99,17 @@ class MainWindow(QMainWindow):
         self.match_hash = 0
         self.match_data = {}
 
+        self.expected_resolution_label = QLabel(self.widget)
+        self.expected_resolution_label.setText("Ожидаемое разрешение в метрах")
+        self.layout.addWidget(self.expected_resolution_label, 5, 0, 1, 1)
+        self.expected_resolution_line = QSpinBox(self.widget)
+        self.expected_resolution_line.setRange(1, 1000)
+        self.expected_resolution_line.setValue(30)
+        self.expected_resolution_line.setSingleStep(10)
+        self.layout.addWidget(self.expected_resolution_line, 5, 1, 1, 1)
+
         self.choice_button_layout = QHBoxLayout()
-        self.layout.addLayout(self.choice_button_layout, 5, 0, 1, 2)
+        self.layout.addLayout(self.choice_button_layout, 6, 0, 1, 2)
 
         self.field_choice_button = QPushButton("Поля", self.widget)
         self.field_choice_button.clicked.connect(self.field_choice_button_clicked)
@@ -115,7 +124,7 @@ class MainWindow(QMainWindow):
 
         self.start_button = QPushButton("Начать", self.widget)
         self.start_button.clicked.connect(self.start_button_clicked)
-        self.layout.addWidget(self.start_button, 6, 0, 1, 2)
+        self.layout.addWidget(self.start_button, 7, 0, 1, 2)
 
     def load_match_data(self):
         match_path = self.match_line.text()
@@ -166,6 +175,7 @@ class MainWindow(QMainWindow):
         fields = self.field_choice_widget.selected_item_texts()
         coefficients = self.coefficient_choice_widget.selected_item_texts()
         match = self.match_line.text()
+        expected_resolution = self.expected_resolution_line.value()
         if directory == "":
             self.message("Ошибка: папка с исходными данными не выбрана", 3000)
         elif shape == "":
@@ -187,6 +197,7 @@ class MainWindow(QMainWindow):
                 "fields": fields,
                 "coefficients": coefficients,
                 "match_fields": self.match_data,
+                "expected_resolution": expected_resolution,
             }
             self.new_thread = QThread()
             worker = Worker()
