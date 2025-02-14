@@ -32,7 +32,7 @@ def process_all(data, callback):
     process_field(data, str(data["index"]), shapes[data["index"]], callback)
 
 
-def reproj_match(infile, dst_crs, outfile):
+def reproj_match(infile, dst_crs, expected_resolution, outfile):
     # open input
     with rasterio.open(infile) as src:
         src_transform = src.transform
@@ -45,7 +45,7 @@ def reproj_match(infile, dst_crs, outfile):
             src.height,  # input height
             *src.bounds,  # unpacks input outer boundaries (left, bottom, right, top)
         )
-        dst_transform, dst_width, dst_height = aligned_target(dst_transform, dst_width, dst_height, 0.00054)
+        dst_transform, dst_width, dst_height = aligned_target(dst_transform, dst_width, dst_height, expected_resolution * 9 / 1000000)
 
         # set properties for output
         dst_kwargs = src.meta.copy()
@@ -77,7 +77,7 @@ def coregister_all(data, callback):
             coefficient_path = os.path.join(directory, coefficient + ".tiff")
             coefficient_path_old = coefficient_path + ".old"
             os.rename(coefficient_path, coefficient_path_old)
-            reproj_match(coefficient_path_old, rasterio.crs.CRS.from_epsg(4326), coefficient_path)
+            reproj_match(coefficient_path_old, rasterio.crs.CRS.from_epsg(4326), data["expected_resolution"], coefficient_path)
             os.remove(coefficient_path_old)
 
 
