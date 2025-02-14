@@ -138,6 +138,8 @@ def process_directory(data, path, callback):
                     file_transform = nir_file.transform
                     file_width = nir_file.width
                     file_height = nir_file.height
+                red = red * 0.0000275 - 0.2
+                nir = nir * 0.0000275 - 0.2
                 coefficient_data = (nir - red) / (nir + red)
                 del red
                 del nir
@@ -155,6 +157,9 @@ def process_directory(data, path, callback):
                     file_transform = nir_file.transform
                     file_width = nir_file.width
                     file_height = nir_file.height
+                red = red * 0.0000275 - 0.2
+                blue = blue * 0.0000275 - 0.2
+                nir = nir * 0.0000275 - 0.2
                 coefficient_data = 2.5 * (nir - red) / (nir + 6 * red - 7.5 * blue + 1)
                 del blue
                 del red
@@ -167,6 +172,8 @@ def process_directory(data, path, callback):
                     file_transform = file.transform
                     file_width = file.width
                     file_height = file.height
+                if coefficient.startswith("BAND"):
+                    coefficient_data = coefficient_data * 0.0000275 - 0.2
 
             coefficient_path = os.path.join(output, "buffer", date, coefficient + ".tiff")
 
