@@ -224,7 +224,7 @@ def process_field(data, field_name, field_shape, callback):
                 x_points, y_points = np.meshgrid(np.arange(x_size), np.arange(y_size))
                 x_coords, y_coords = field_file.xy(x_points.flatten(), y_points.flatten())
                 data_mask = np.where(val.flatten() != no_data)
-                data = np.array([x_coords, y_coords, val.flatten()]).T[data_mask]
+                data = np.array([np.round(x_coords, 6), np.round(y_coords, 6), val.flatten()]).T[data_mask]
             # Удаляем файл обязательно, лишние файлы ломают
             os.remove(os.path.join(output, "buffer", f"{field_name}_{date}_{coefficient}.tiff"))
             for x, y, value in data:
@@ -238,8 +238,6 @@ def process_field(data, field_name, field_shape, callback):
                 data[key] = np.nan
             rows.append({"x": x, "y": y, **data})
         df = pd.DataFrame(rows, columns=['x', 'y', *sorted(dates)])
-        df['x'] = df['x'].round(6)
-        df['y'] = df['y'].round(6)
         if len(df.index) == 0:
             continue
         pathlib.Path(os.path.join(output, coefficient)).mkdir(parents=True, exist_ok=True)

@@ -119,7 +119,8 @@ def process_field(data, field_name, field_shape, callback):
             for x in range(x_size):
                 for y in range(y_size):
                     if val[x, y] != no_data:
-                        data.append((*field_file.xy(x, y), val[x, y]))
+                        x, y = field_file.xy(x, y)
+                        data.append((np.round(x, 6), np.round(y, 6), val[x, y]))
         # Удаляем файл
         os.remove(cropped_filename)
         for x, y, value in data:
