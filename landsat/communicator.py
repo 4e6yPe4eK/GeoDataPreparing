@@ -1,13 +1,14 @@
-import fiona
-import shutil
 import glob
 import json
-import numpy as np
 import os
-import pandas as pd
 import pathlib
-import rasterio
 import re
+import shutil
+
+import fiona
+import numpy as np
+import pandas as pd
+import rasterio
 from rasterio import mask
 from rasterio.warp import calculate_default_transform, reproject, Resampling, aligned_target
 
@@ -73,7 +74,8 @@ def reproj_match(infile, dst_crs, expected_resolution, outfile):
             src.height,  # input height
             *src.bounds,  # unpacks input outer boundaries (left, bottom, right, top)
         )
-        dst_transform, dst_width, dst_height = aligned_target(dst_transform, dst_width, dst_height, expected_resolution * 9 / 1000000)
+        dst_transform, dst_width, dst_height = aligned_target(dst_transform, dst_width, dst_height,
+                                                              expected_resolution * 9 / 1000000)
 
         # set properties for output
         dst_kwargs = src.meta.copy()
@@ -105,7 +107,8 @@ def coregister_all(data, callback):
             coefficient_path = os.path.join(directory, coefficient + ".tiff")
             coefficient_path_old = coefficient_path + ".old"
             os.rename(coefficient_path, coefficient_path_old)
-            reproj_match(coefficient_path_old, rasterio.crs.CRS.from_epsg(4326), data["expected_resolution"], coefficient_path)
+            reproj_match(coefficient_path_old, rasterio.crs.CRS.from_epsg(4326), data["expected_resolution"],
+                         coefficient_path)
             os.remove(coefficient_path_old)
 
 
@@ -219,7 +222,7 @@ def process_field(data, field_name, field_shape, callback):
             with rasterio.open(field_path) as field_file:
                 # no_data = field_file.nodata
                 no_data = 0.0
-                val : np.ndarray = field_file.read(1, masked=False)
+                val: np.ndarray = field_file.read(1, masked=False)
                 x_size, y_size = field_file.shape
                 x_points, y_points = np.meshgrid(np.arange(x_size), np.arange(y_size))
                 x_coords, y_coords = field_file.xy(x_points.flatten(), y_points.flatten())
@@ -243,6 +246,16 @@ def process_field(data, field_name, field_shape, callback):
         pathlib.Path(os.path.join(output, coefficient)).mkdir(parents=True, exist_ok=True)
         filename = os.path.join(output, coefficient, field_name + ".csv")
         if os.path.isfile(filename):
-            df = pd.merge(df, pd.read_csv(filename, sep=const.DELIMITER), on=["x", "y"], how="outer")
+            df = pd.merge(df, pd.read_csv(filename, sep=const.DELIMITER), on=['x', 'y'], how='outer',
+                          suffixes=('_x', '_y'))
+            bad_cols = []
+            for col in df.columns:
+                if col.endswith("_x"):
+                    bad_cols.append(col[:-2])
+            for base in bad_cols:
+                x_col = f"{base}_x"
+                y_col = f"{base}_y"
+                df[base] = df[x_col].combine_first(df[y_col])
+                df.drop(columns=[x_col, y_col], inplace=True)
         df = df.loc[:, ~df.columns.duplicated()].copy()  # Удаляет повторяющиеся столбцы
         df.to_csv(filename, index=False, sep=const.DELIMITER)
