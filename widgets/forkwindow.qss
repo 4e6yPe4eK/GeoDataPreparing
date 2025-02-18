@@ -1,0 +1,28 @@
+QWidget#ForkButtonWidget {
+	background-color: #404a4d;
+}
+
+QWidget#ForkButtonWidget>QPushButton {
+    max-width: 114px;
+    min-width: 114px;
+    color: #b7c2cc;
+    font-size: 15px;
+    border-style: solid;
+    padding: 20px;
+    background-color: #404a4d;
+}
+
+QWidget#ForkButtonWidget>QPushButton:hover {
+    border-style: solid;
+    background-color: #606f73;
+}
+
+QWidget#ForkButtonWidget>QPushButton:pressed {
+    border-left: 3px solid #83989d;
+}
+
+QWidget#ForkButtonWidget>QPushButton:disabled {
+    border-style: solid;
+    background-color: #2f3638;
+    border-left: 3px solid #83989d;
+}

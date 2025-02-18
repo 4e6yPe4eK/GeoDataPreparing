@@ -1,16 +1,12 @@
 import logging
 from functools import partial
 
-import openpyxl
-from PyQt5.QtCore import QThread, QObject, QLocale, pyqtSignal
-from PyQt5.QtWidgets import (QMainWindow, QWidget, QPushButton, QGridLayout, QLineEdit,
-                             QFileDialog, QLabel, QSpinBox)
-from PyQt5.QtGui import QDoubleValidator, QIntValidator
+from PyQt5.QtWidgets import (QWidget, QPushButton, QGridLayout, QLineEdit, QStatusBar,
+                             QFileDialog, QLabel, QSpinBox, QVBoxLayout, QSizePolicy)
+from PyQt5.QtCore import QThread, QObject, pyqtSignal
+from PyQt5.QtGui import QIntValidator
 
-from drone import communicator, const
-from widgets.checkboxlistwidget import CheckboxListWidget
-
-logging.basicConfig(filename="log.log", level=logging.INFO)
+from drone import communicator
 
 
 class Worker(QObject):
@@ -30,17 +26,20 @@ class Worker(QObject):
         self.finished.emit()
 
 
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Drone")
-        self.resize(800, 600)
-        self.message("", 1)
+class DroneTab(QWidget):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.new_thread = None
         self.error_state = False
 
+        self.main_layout = QVBoxLayout(self)
+
         self.widget = QWidget(self)
-        self.setCentralWidget(self.widget)
+        self.main_layout.addWidget(self.widget)
+
+        self.status_bar = QStatusBar(self)
+        self.status_bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.main_layout.addWidget(self.status_bar)
 
         self.layout = QGridLayout(self.widget)
         self.widget.setLayout(self.layout)
@@ -88,7 +87,7 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.start_button, 6, 0, 1, 2)
 
     def message(self, text, time=0):
-        self.statusBar().showMessage(text, time)
+        self.status_bar.showMessage(text, time)
 
     def directory_button_clicked(self):
         directory = QFileDialog.getExistingDirectory(self, "Выбрать папку")

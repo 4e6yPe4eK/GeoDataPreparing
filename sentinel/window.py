@@ -1,16 +1,13 @@
-import sys
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QPushButton, QGridLayout, QLineEdit,
-                             QFileDialog, QHBoxLayout, QRadioButton, QButtonGroup, QSpinBox, QLabel)
+import logging
+from functools import partial
+
+from PyQt5.QtWidgets import (QWidget, QPushButton, QGridLayout, QLineEdit, QStatusBar, QButtonGroup,
+                             QFileDialog, QHBoxLayout, QLabel, QSpinBox, QVBoxLayout, QSizePolicy, QRadioButton)
 from PyQt5.QtCore import QThread, QObject, pyqtSignal
 import openpyxl
-from widgets.checkboxlistwidget import CheckboxListWidget
-from functools import partial
-import logging
 
+from widgets import CheckboxListWidget
 from sentinel import communicator, const
-
-
-logging.basicConfig(filename="log.log", level=logging.INFO)
 
 
 class Worker(QObject):
@@ -30,17 +27,20 @@ class Worker(QObject):
         self.finished.emit()
 
 
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Sentinel")
-        self.resize(800, 600)
-        self.message("", 1)
+class SentinelTab(QWidget):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.new_thread = None
         self.error_state = False
 
+        self.main_layout = QVBoxLayout(self)
+
         self.widget = QWidget(self)
-        self.setCentralWidget(self.widget)
+        self.main_layout.addWidget(self.widget)
+
+        self.status_bar = QStatusBar(self)
+        self.status_bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.main_layout.addWidget(self.status_bar)
 
         self.layout = QGridLayout(self.widget)
         self.widget.setLayout(self.layout)
@@ -136,7 +136,7 @@ class MainWindow(QMainWindow):
             self.match_data[int(row[0].value)] = str(row[1].value)
 
     def message(self, text, time=0):
-        self.statusBar().showMessage(text, time)
+        self.status_bar.showMessage(text, time)
 
     def directory_button_clicked(self):
         directory = QFileDialog.getExistingDirectory(self, "Выбрать папку")
