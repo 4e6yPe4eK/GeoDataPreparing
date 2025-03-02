@@ -1,13 +1,17 @@
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QListWidget, QListWidgetItem, QPushButton
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QListWidget, QListWidgetItem, QPushButton, QLabel
 from PyQt5.QtCore import Qt, QSignalBlocker
 
 
 class CheckboxListWidget(QDialog):
-    def __init__(self, *args, choices=None, **kwargs):
+    def __init__(self, *args, choices=None, display_total=True, **kwargs):
         super(CheckboxListWidget, self).__init__(*args, **kwargs)
         self.resize(600, 800)
 
         self.layout = QVBoxLayout(self)
+
+        self.display_total = display_total
+        self.total = 0
+        self.total_label = QLabel(self)
 
         self.list_widget = QListWidget(self)
         self.layout.addWidget(self.list_widget)
@@ -19,12 +23,17 @@ class CheckboxListWidget(QDialog):
         self.confirm_button.clicked.connect(self.confirm_button_clicked)
         self.layout.addWidget(self.confirm_button)
 
+        if self.display_total:
+            self.total_label.setText(f"{self.total}/{self.total}")
+            self.layout.addWidget(self.total_label)
+
     def set_choices(self, choices):
         self.list_widget.clear()
         self.all_items_list_widget = QListWidgetItem()
         self.all_items_list_widget.setText("Выбрать все")
         self.list_widget.addItem(self.all_items_list_widget)
         if choices:
+            self.total = len(choices)
             for choice in choices:
                 item = QListWidgetItem()
                 item.setCheckState(Qt.Unchecked)
@@ -38,15 +47,17 @@ class CheckboxListWidget(QDialog):
             with QSignalBlocker(self.list_widget):
                 for i in range(self.list_widget.count()):
                     self.list_widget.item(i).setCheckState(state)
-            return
-        if item.checkState() == Qt.Checked:
-            if all((self.list_widget.item(i).checkState() == Qt.Checked or
-                    self.list_widget.item(i) is self.all_items_list_widget for i in range(self.list_widget.count()))):
+        else:
+            if item.checkState() == Qt.Checked:
+                if all((self.list_widget.item(i).checkState() == Qt.Checked or
+                        self.list_widget.item(i) is self.all_items_list_widget for i in range(self.list_widget.count()))):
+                    with QSignalBlocker(self.list_widget):
+                        self.all_items_list_widget.setCheckState(Qt.Checked)
+            elif item.checkState() == Qt.Unchecked:
                 with QSignalBlocker(self.list_widget):
-                    self.all_items_list_widget.setCheckState(Qt.Checked)
-        elif item.checkState() == Qt.Unchecked:
-            with QSignalBlocker(self.list_widget):
-                self.all_items_list_widget.setCheckState(Qt.Unchecked)
+                    self.all_items_list_widget.setCheckState(Qt.Unchecked)
+        if self.display_total:
+            self.total_label.setText(f"{len(self.selected_item_texts())}/{self.total}")
 
     def selected_item_texts(self):
         ret = []
