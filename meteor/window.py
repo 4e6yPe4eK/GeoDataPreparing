@@ -85,7 +85,7 @@ class MeteorTab(QWidget):
         self.layout.addWidget(self.expected_resolution_label, 4, 0, 1, 1)
         self.expected_resolution_line = QSpinBox(self.widget)
         self.expected_resolution_line.setRange(1, 1000)
-        self.expected_resolution_line.setValue(30)
+        self.expected_resolution_line.setValue(60)
         self.expected_resolution_line.setSingleStep(10)
         self.layout.addWidget(self.expected_resolution_line, 4, 1, 1, 1)
 
