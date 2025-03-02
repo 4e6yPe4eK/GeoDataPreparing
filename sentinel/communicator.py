@@ -281,14 +281,10 @@ def process_field(data, field_name, field_shape, callback):
                 continue
 
             with rasterio.open(field_path) as field_file:
-                # no_data = field_file.nodata
-                no_data = 0.0
-                val: np.ndarray = field_file.read(1, masked=False)
-                x_size, y_size = field_file.shape
-                x_points, y_points = np.meshgrid(np.arange(x_size), np.arange(y_size))
-                x_coords, y_coords = field_file.xy(x_points.flatten(), y_points.flatten())
-                data_mask = np.where(val.flatten() != no_data)
-                data = np.array([np.round(x_coords, 6), np.round(y_coords, 6), val.flatten()]).T[data_mask]
+                val: np.ma.masked_array = field_file.read(1, masked=True)
+                x_points, y_points = np.ma.where(val)
+                x_coords, y_coords = field_file.xy(x_points, y_points)
+                data = np.array([np.round(x_coords, 6), np.round(y_coords, 6), val.compressed()]).T
             # Удаляем файл обязательно, лишние файлы ломают
             os.remove(os.path.join(output, "buffer", f"{field_name}_{date}_{coefficient}.tiff"))
             for x, y, value in data:
