@@ -5,6 +5,7 @@ from landsat.window import LandsatTab
 from meteor.window import MeteorTab
 from sentinel.window import SentinelTab
 from drone.window import DroneTab
+from custom.window import CustomTab
 from widgets import ForkWindow
 
 
@@ -20,6 +21,7 @@ class MainWindow(QMainWindow):
         self.fork_widget.add_tab("Landsat", LandsatTab(self))
         self.fork_widget.add_tab("Meteor", MeteorTab(self))
         self.fork_widget.add_tab("Drone", DroneTab(self))
+        self.fork_widget.add_tab("Custom", CustomTab(self))
         self.setCentralWidget(self.fork_widget)
 
 
