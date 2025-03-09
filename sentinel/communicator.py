@@ -232,6 +232,26 @@ def process_directory(data, path, callback):
                 del blue
                 del red
                 del nir
+            elif coefficient == "NDWI-1":
+                file_crs, file_transform, file_width, file_height, nir = load_coefficient(path, resolution, "B8A", date)
+                file_crs, file_transform, file_width, file_height, swir = load_coefficient(path, resolution, "B11", date)
+                if nir is None:
+                    callback(f"Can't find B8A, path: {path}", callback_type="error")
+                    continue
+                if swir is None:
+                    callback(f"Can't find B11, path: {path}", callback_type="error")
+                    continue
+                coefficient_data = (nir - swir) / (nir + swir)
+            elif coefficient == "NDWI-2":
+                file_crs, file_transform, file_width, file_height, nir = load_coefficient(path, resolution, "B8A", date)
+                file_crs, file_transform, file_width, file_height, green = load_coefficient(path, resolution, "B03", date)
+                if nir is None:
+                    callback(f"Can't find B8A, path: {path}", callback_type="error")
+                    continue
+                if green is None:
+                    callback(f"Can't find B03, path: {path}", callback_type="error")
+                    continue
+                coefficient_data = (green - nir) / (green + nir)
             else:
                 file_crs, file_transform, file_width, file_height, coefficient_data = \
                     load_coefficient(path, resolution, coefficient, date)
