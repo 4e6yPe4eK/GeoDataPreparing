@@ -1,0 +1,4 @@
+METEOR_COEFFICIENT_NAMES = ["RED", "NIR", "NDVI"]
+FORMULAS = {
+    "NDVI": "(NIR - RED) / (NIR + RED)",
+}

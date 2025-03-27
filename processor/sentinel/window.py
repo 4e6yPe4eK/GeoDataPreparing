@@ -1,33 +1,20 @@
 import logging
 from functools import partial
 
-from PyQt5.QtWidgets import (QWidget, QPushButton, QGridLayout, QLineEdit, QStatusBar,
-                             QFileDialog, QHBoxLayout, QLabel, QSpinBox, QVBoxLayout, QSizePolicy)
+from PyQt5.QtWidgets import (QWidget, QPushButton, QGridLayout, QLineEdit, QStatusBar, QButtonGroup,
+                             QFileDialog, QHBoxLayout, QLabel, QSpinBox, QVBoxLayout, QSizePolicy, QRadioButton)
 from PyQt5.QtCore import QThread, QObject, pyqtSignal
 import openpyxl
 
 from widgets import CheckboxListWidget
-from meteor import communicator, const
+from .const import COEFFICIENT_NAMES_R10, COEFFICIENT_NAMES_R20, COEFFICIENT_NAMES_R60
+from .communicator import SentinelProcessor
+from processor.worker import Worker
+
+logger = logging.getLogger(__name__)
 
 
-class Worker(QObject):
-    finished = pyqtSignal()
-    progressChanged = pyqtSignal(int)
-    errorRaised = pyqtSignal(str)
-
-    def callback_function(self, *args, callback_type="percent"):
-        if callback_type == "percent":
-            self.progressChanged.emit(args[0])
-        if callback_type == "error":
-            self.errorRaised.emit(args[0])
-
-    def run(self, data):
-        self.progressChanged.emit(0)
-        communicator.parse_directories(data, self.callback_function)
-        self.finished.emit()
-
-
-class MeteorTab(QWidget):
+class SentinelTab(QWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.new_thread = None
@@ -53,44 +40,63 @@ class MeteorTab(QWidget):
         self.directory_button.clicked.connect(self.directory_button_clicked)
         self.layout.addWidget(self.directory_button, 0, 1, 1, 1)
 
+        self.r_button_layout = QHBoxLayout()
+        self.layout.addLayout(self.r_button_layout, 1, 0, 1, 2)
+
+        self.r10_button = QRadioButton("R10m", self.widget)
+        self.r10_button.setChecked(True)
+        self.r_button_layout.addWidget(self.r10_button)
+
+        self.r20_button = QRadioButton("R20m", self.widget)
+        self.r_button_layout.addWidget(self.r20_button)
+
+        self.r60_button = QRadioButton("R60m", self.widget)
+        self.r_button_layout.addWidget(self.r60_button)
+
+        self.r_button_group = QButtonGroup()
+        self.r_button_group.addButton(self.r10_button)
+        self.r_button_group.addButton(self.r20_button)
+        self.r_button_group.addButton(self.r60_button)
+        self.r_button_group.buttonClicked.connect(self.r_button_group_clicked)
+
         self.shape_line = QLineEdit(self.widget)
         self.shape_line.setPlaceholderText("Путь к shape-файлу")
-        self.layout.addWidget(self.shape_line, 1, 0, 1, 1)
+        self.layout.addWidget(self.shape_line, 2, 0, 1, 1)
 
         self.shape_button = QPushButton("Выбрать", self.widget)
         self.shape_button.clicked.connect(self.shape_button_clicked)
-        self.layout.addWidget(self.shape_button, 1, 1, 1, 1)
+        self.layout.addWidget(self.shape_button, 2, 1, 1, 1)
 
         self.output_line = QLineEdit(self.widget)
         self.output_line.setPlaceholderText("Путь к папке для сохранения")
-        self.layout.addWidget(self.output_line, 2, 0, 1, 1)
+        self.layout.addWidget(self.output_line, 3, 0, 1, 1)
 
         self.output_button = QPushButton("Выбрать", self.widget)
         self.output_button.clicked.connect(self.output_button_clicked)
-        self.layout.addWidget(self.output_button, 2, 1, 1, 1)
+        self.layout.addWidget(self.output_button, 3, 1, 1, 1)
 
         self.match_line = QLineEdit(self.widget)
         self.match_line.setPlaceholderText("Путь к файлу для сопоставления названий полей")
-        self.layout.addWidget(self.match_line, 3, 0, 1, 1)
+        self.layout.addWidget(self.match_line, 4, 0, 1, 1)
 
         self.match_button = QPushButton("Выбрать", self.widget)
         self.match_button.clicked.connect(self.match_button_clicked)
-        self.layout.addWidget(self.match_button, 3, 1, 1, 1)
+        self.layout.addWidget(self.match_button, 4, 1, 1, 1)
 
         self.match_hash = 0
         self.match_data = {}
 
         self.expected_resolution_label = QLabel(self.widget)
         self.expected_resolution_label.setText("Ожидаемое разрешение в метрах")
-        self.layout.addWidget(self.expected_resolution_label, 4, 0, 1, 1)
+        self.layout.addWidget(self.expected_resolution_label, 5, 0, 1, 1)
         self.expected_resolution_line = QSpinBox(self.widget)
         self.expected_resolution_line.setRange(1, 1000)
-        self.expected_resolution_line.setValue(60)
+        self.expected_resolution_line.setValue(20)
         self.expected_resolution_line.setSingleStep(10)
-        self.layout.addWidget(self.expected_resolution_line, 4, 1, 1, 1)
+        self.layout.addWidget(self.expected_resolution_line, 5, 1, 1, 1)
 
         self.choice_button_layout = QHBoxLayout()
-        self.layout.addLayout(self.choice_button_layout, 5, 0, 1, 2)
+        self.layout.addLayout(self.choice_button_layout, 6, 0, 1, 2)
 
         self.field_choice_button = QPushButton("Поля", self.widget)
         self.field_choice_button.clicked.connect(self.field_choice_button_clicked)
@@ -101,11 +107,11 @@ class MeteorTab(QWidget):
         self.coefficient_choice_button.clicked.connect(self.coefficient_choice_button_clicked)
         self.choice_button_layout.addWidget(self.coefficient_choice_button)
         self.coefficient_choice_widget = CheckboxListWidget(self.widget)
-        self.coefficient_choice_widget.set_choices(choices=const.METEOR_COEFFICIENT_NAMES)
+        self.r_button_group_clicked()
 
         self.start_button = QPushButton("Начать", self.widget)
         self.start_button.clicked.connect(self.start_button_clicked)
-        self.layout.addWidget(self.start_button, 6, 0, 1, 2)
+        self.layout.addWidget(self.start_button, 7, 0, 1, 2)
 
     def load_match_data(self):
         match_path = self.match_line.text()
@@ -152,6 +158,7 @@ class MeteorTab(QWidget):
         directory = self.directory_line.text()
         shape = self.shape_line.text()
         output = self.output_line.text()
+        resolution = self.r_button_group.checkedButton().text()
         fields = self.field_choice_widget.selected_item_texts()
         coefficients = self.coefficient_choice_widget.selected_item_texts()
         match = self.match_line.text()
@@ -170,16 +177,17 @@ class MeteorTab(QWidget):
                 self.field_choice_widget.set_choices(sorted(set(self.match_data.values())))
                 fields = self.field_choice_widget.selected_item_texts()
             data = {
-                "directory": directory,
-                "shape": shape,
-                "output": output,
-                "fields": fields,
+                "input_path": directory,
+                "shape_path": shape,
+                "output_path": output,
+                "source_resolution": resolution,
+                "fields_whitelist": fields,
                 "coefficients": coefficients,
                 "match_fields": self.match_data,
                 "expected_resolution": expected_resolution,
             }
             self.new_thread = QThread()
-            worker = Worker()
+            worker = Worker(SentinelProcessor)
             worker.moveToThread(self.new_thread)
             self.new_thread.started.connect(partial(worker.run, data))
             worker.finished.connect(self.new_thread.quit)
@@ -192,11 +200,22 @@ class MeteorTab(QWidget):
             self.start_button.setText("Идет обработка...")
             self.start_button.setEnabled(False)
 
+    def r_button_group_clicked(self):
+        btn = self.r_button_group.checkedButton()
+        choices = []
+        if btn is self.r10_button:
+            choices = COEFFICIENT_NAMES_R10
+        if btn is self.r20_button:
+            choices = COEFFICIENT_NAMES_R20
+        if btn is self.r60_button:
+            choices = COEFFICIENT_NAMES_R60
+        self.coefficient_choice_widget.set_choices(choices)
+
     def progress_changed(self, percent):
         self.message(f"Завершено на {percent}%")
 
     def error_raised(self, message):
-        logging.error(message)
+        logger.warning(message)
         self.error_state = True
 
     def finished_function(self):

@@ -7,24 +7,10 @@ from PyQt5.QtWidgets import (QWidget, QPushButton, QGridLayout, QLineEdit, QStat
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
 
 from widgets import CheckboxListWidget
-from custom import communicator
+from .communicator import CustomProcessor
+from processor.worker import Worker
 
-
-class Worker(QObject):
-    finished = pyqtSignal()
-    progressChanged = pyqtSignal(int)
-    errorRaised = pyqtSignal(str)
-
-    def callback_function(self, *args, callback_type="percent"):
-        if callback_type == "percent":
-            self.progressChanged.emit(args[0])
-        if callback_type == "error":
-            self.errorRaised.emit(args[0])
-
-    def run(self, data):
-        self.progressChanged.emit(0)
-        communicator.run(data, self.callback_function)
-        self.finished.emit()
+logger = logging.getLogger(__name__)
 
 
 class CustomTab(QWidget):
@@ -160,15 +146,15 @@ class CustomTab(QWidget):
                 self.field_choice_widget.set_choices(sorted(set(self.match_data.values())))
                 fields = self.field_choice_widget.selected_item_texts()
             data = {
-                "path": path,
-                "shape": shape,
-                "output": output,
-                "fields": fields,
+                "input_path": path,
+                "shape_path": shape,
+                "output_path": output,
+                "fields_whitelist": fields,
                 "match_fields": self.match_data,
                 "expected_resolution": expected_resolution,
             }
             self.new_thread = QThread()
-            worker = Worker()
+            worker = Worker(CustomProcessor)
             worker.moveToThread(self.new_thread)
             self.new_thread.started.connect(partial(worker.run, data))
             worker.finished.connect(self.new_thread.quit)
@@ -185,7 +171,7 @@ class CustomTab(QWidget):
         self.message(f"Завершено на {percent}%")
 
     def error_raised(self, message):
-        logging.error(message)
+        logger.warning(message)
         self.error_state = True
 
     def finished_function(self):

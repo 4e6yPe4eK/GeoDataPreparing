@@ -1,12 +1,11 @@
+import logging
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow
 
-from landsat.window import LandsatTab
-from meteor.window import MeteorTab
-from sentinel.window import SentinelTab
-from drone.window import DroneTab
-from custom.window import CustomTab
+from processor.window import SentinelTab, LandsatTab, MeteorTab, DroneTab, CustomTab
 from widgets import ForkWindow
+
+logging.basicConfig(encoding="utf-8", level=logging.ERROR, handlers=[logging.StreamHandler(sys.stderr), logging.FileHandler("log.log")])
 
 
 class MainWindow(QMainWindow):
