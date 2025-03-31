@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class DroneProcessor(AbstractProcessor):
     def __init__(self, input_path: str, output_path: str, shape_path: str, expected_resolution: int, shape_index: int,
                  callback: Callable):
-        super().__init__(input_path, output_path, shape_path, expected_resolution, [str(shape_index)], [str(i) for i in range(shape_index + 1)], callback)
+        super().__init__(input_path, output_path, shape_path, expected_resolution, [str(shape_index)], {i: str(i) for i in range(shape_index + 1)}, callback)
 
     def run(self):
         files = glob.glob(os.path.join(self.input_path, "*"))

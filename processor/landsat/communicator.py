@@ -5,7 +5,7 @@ import os
 import pathlib
 import re
 import shutil
-from typing import List, Sequence, Callable
+from typing import List, Sequence, Callable, Dict
 
 import rasterio
 
@@ -20,7 +20,7 @@ class LandsatProcessor(AbstractProcessor):
     directories: List[str]
 
     def __init__(self, input_path: str, output_path: str, shape_path: str, expected_resolution: int,
-                 fields_whitelist: Sequence[str], match_fields: List[str], coefficients: List[str],
+                 fields_whitelist: Sequence[str], match_fields: Dict[int, str], coefficients: List[str],
                  callback: Callable):
         super().__init__(input_path, output_path, shape_path, expected_resolution, fields_whitelist, match_fields,
                          callback)

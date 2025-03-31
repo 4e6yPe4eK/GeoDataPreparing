@@ -5,7 +5,7 @@ import os
 import pathlib
 import re
 import shutil
-from typing import List, Sequence, Callable, Literal
+from typing import List, Sequence, Callable, Literal, Dict
 
 import numpy as np
 import rasterio
@@ -22,7 +22,7 @@ class SentinelProcessor(AbstractProcessor):
     directories: List[str]
 
     def __init__(self, input_path: str, output_path: str, shape_path: str, expected_resolution: int,
-                 fields_whitelist: Sequence[str], match_fields: List[str],
+                 fields_whitelist: Sequence[str], match_fields: Dict[int, str],
                  source_resolution: Literal["R10m", "R20m", "R60m"], coefficients: List[str],
                  callback: Callable):
         super().__init__(input_path, output_path, shape_path, expected_resolution, fields_whitelist, match_fields,
@@ -70,7 +70,7 @@ class SentinelProcessor(AbstractProcessor):
             return None
         if coefficient in FORMULAS:
             formula = FORMULAS[coefficient]
-            return self.get_calculation_coefficient_path(formula, directory_path, coefficient, )
+            return self.get_calculation_coefficient_path(formula, directory_path, coefficient, date)
         return None
 
     def run(self):

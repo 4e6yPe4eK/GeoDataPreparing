@@ -1,7 +1,7 @@
 import ast
 import logging
 import os
-from typing import List, Set, Sequence, Callable
+from typing import List, Set, Sequence, Callable, Dict
 
 import fiona
 import numpy as np
@@ -34,14 +34,16 @@ class AbstractProcessor:
     match_fields: List[str]
 
     def __init__(self, input_path: str, output_path: str, shape_path: str, expected_resolution: int,
-                 fields_whitelist: Sequence[str], match_fields: List[str], callback: Callable):
+                 fields_whitelist: Sequence[str], match_fields: Dict[int, str], callback: Callable):
         self.input_path = input_path
         self.output_path = output_path
         self.buffer_path = os.path.join(self.output_path, "buffer")
         self.crs, self.shapes = load_shape(shape_path)
         self.expected_resolution = expected_resolution
         self.fields_whitelist = set(fields_whitelist)
-        self.match_fields = match_fields
+        self.match_fields = []
+        for i in range(len(self.shapes)):
+            self.match_fields.append(match_fields.get(i, "out"))
         self.callback = callback
 
     def run(self) -> None:
@@ -86,31 +88,34 @@ class AbstractProcessor:
                         continue
                     try:
                         out_image, out_transform = mask(src, [field_shape], filled=False, crop=True)
-                        out_image = np.ma.squeeze(out_image)
+                        out_image = np.ma.squeeze(out_image, axis=0)
                     except ValueError:
                         self.callback(f"Field {field_name} is not presented in {file_path}", callback_type="error")
                         continue
-                    x_points, y_points = np.ma.where(out_image)
+                    x_points, y_points = np.where(~out_image.mask)
                     x_coords, y_coords = rasterio.transform.xy(out_transform, x_points, y_points)
                     data = np.array([np.round(x_coords, 6), np.round(y_coords, 6), out_image.compressed()]).T
                     df = pd.DataFrame(data, columns=["x", "y", date])
                     if len(df.index) == 0:
                         continue
                     out_filename = os.path.join(output_directory_path, field_name + ".csv")
-                    if os.path.isfile(out_filename):
-                        df = pd.merge(df, pd.read_csv(out_filename, sep=DELIMITER), on=['x', 'y'], how='outer',
-                                      suffixes=('_x', '_y'))
-                        bad_cols = []
-                        for col in df.columns:
-                            if col.endswith("_x"):
-                                bad_cols.append(col[:-2])
-                        for base in bad_cols:
-                            x_col = f"{base}_x"
-                            y_col = f"{base}_y"
-                            df[base] = df[x_col].combine_first(df[y_col])
-                            df.drop(columns=[x_col, y_col], inplace=True)
-                        sorted_columns = ['x', 'y'] + sorted([col for col in df.columns if col not in ['x', 'y']])
-                        df = df[sorted_columns]
+                    if os.path.exists(out_filename):
+                        try:
+                            new_df = pd.merge(df, pd.read_csv(out_filename, sep=DELIMITER), on=['x', 'y'], how='outer',
+                                          suffixes=('_x', '_y'))
+                            bad_cols = []
+                            for col in new_df.columns:
+                                if col.endswith("_x"):
+                                    bad_cols.append(col[:-2])
+                            for base in bad_cols:
+                                x_col = f"{base}_x"
+                                y_col = f"{base}_y"
+                                new_df[base] = new_df[x_col].combine_first(new_df[y_col])
+                                new_df.drop(columns=[x_col, y_col], inplace=True)
+                            sorted_columns = ['x', 'y'] + sorted([col for col in new_df.columns if col not in ['x', 'y']])
+                            df = new_df[sorted_columns]
+                        except pd.errors.EmptyDataError:
+                            pass
                     df.to_csv(out_filename, index=False, sep=DELIMITER)
                 except Exception as e:
                     logger.exception(f"field_name-{field_name},file-{file_path}")
