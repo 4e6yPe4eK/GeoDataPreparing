@@ -154,7 +154,7 @@ class AbstractProcessor:
         meta["driver"] = "GTiff"
         meta["dtype"] = "float32"
         with np.errstate(divide='ignore'):
-            data = eval(formula, locals=variables)
+            data = eval(formula, {"__builtins__": {'__import__': __import__}}, variables)
 
         with rasterio.open(out_filename, 'w', **meta) as output:
             output.write(data, 1)
