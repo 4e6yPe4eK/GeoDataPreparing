@@ -18,9 +18,11 @@ class DroneProcessor(AbstractProcessor):
         files = glob.glob(os.path.join(self.input_path, "*"))
         for file in files:
             try:
-                with tempfile.NamedTemporaryFile() as tmpfile:
+                with tempfile.NamedTemporaryFile(delete=False) as tmpfile:
+                    tmpfile.close()
                     self.reproject_one(file, tmpfile.name)
                     self.process_file(tmpfile.name, self.output_path, os.path.basename(file))
+                    os.unlink(tmpfile.name)
             except Exception as e:
                 logger.exception(f"Error while processing file: {file}")
                 self.callback(f"Unexpected exception for file: {file}", callback_type="error")
