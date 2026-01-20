@@ -85,7 +85,7 @@ class LandsatProcessor(AbstractProcessor):
                         out_path = os.path.join(self.output_path, coefficient)
                         self.process_file(reprojected_path, out_path, date)
                 except Exception as e:
-                    logger.exception("Landsat directory exception")
+                    logger.exception(f"Landsat exception in directory {directory}")
                     self.callback(f"Exception in directory {directory}", callback_type="error")
                     continue
         except Exception:

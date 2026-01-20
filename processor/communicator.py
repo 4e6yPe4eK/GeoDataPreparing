@@ -35,6 +35,7 @@ class AbstractProcessor:
 
     def __init__(self, input_path: str, output_path: str, shape_path: str, expected_resolution: int,
                  fields_whitelist: Sequence[str], match_fields: Dict[int, str], callback: Callable):
+        logger.info(f"{self.__class__.__name__} initializing with input {input_path} and shape {shape_path}")
         self.input_path = input_path
         self.output_path = output_path
         self.buffer_path = os.path.join(self.output_path, "buffer")
@@ -79,6 +80,8 @@ class AbstractProcessor:
     def process_file(self, file_path: str, output_directory_path: str, date: str) -> None:
         with rasterio.open(file_path) as src:
             for field_index, field_shape in enumerate(self.shapes):
+                if not field_shape:
+                    continue
                 if field_index >= len(self.match_fields) or self.match_fields[field_index] not in self.fields_whitelist:
                     continue
                 field_name = self.match_fields[field_index]

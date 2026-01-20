@@ -69,7 +69,7 @@ class MeteorProcessor(AbstractProcessor):
                         out_path = os.path.join(self.output_path, coefficient)
                         self.process_file(reprojected_path, out_path, date)
                 except Exception as e:
-                    logger.exception("Meteor directory exception")
+                    logger.exception(f"Meteor exception in date {date}")
                     self.callback(f"Exception in date {date}", callback_type="error")
                     continue
         except Exception:

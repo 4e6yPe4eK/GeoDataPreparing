@@ -171,10 +171,10 @@ class CustomTab(QWidget):
         self.message(f"Завершено на {percent}%")
 
     def error_raised(self, message):
-        logger.warning(message)
         self.error_state = True
 
     def finished_function(self):
+        self.new_thread.quit()
         self.start_button.setText("Начать")
         self.start_button.setEnabled(True)
         if self.error_state:
