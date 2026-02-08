@@ -3,7 +3,7 @@ from functools import partial
 
 import openpyxl
 from PyQt5.QtWidgets import (QWidget, QPushButton, QGridLayout, QLineEdit, QStatusBar,
-                             QFileDialog, QLabel, QSpinBox, QVBoxLayout, QSizePolicy)
+                             QFileDialog, QLabel, QSpinBox, QVBoxLayout, QSizePolicy, QHBoxLayout)
 from PyQt5.QtCore import QObject, QThread, pyqtSignal
 
 from widgets import CheckboxListWidget
@@ -35,9 +35,14 @@ class CustomTab(QWidget):
         self.path_line.setPlaceholderText("Путь к снимку")
         self.layout.addWidget(self.path_line, 0, 0, 1, 1)
 
-        self.path_button = QPushButton("Выбрать", self.widget)
-        self.path_button.clicked.connect(self.path_button_clicked)
-        self.layout.addWidget(self.path_button, 0, 1, 1, 1)
+        self.path_buttons_layout = QVBoxLayout()
+        self.path_file_button = QPushButton("Выбрать(файл)", self.widget)
+        self.path_file_button.clicked.connect(self.path_file_button_clicked)
+        self.path_buttons_layout.addWidget(self.path_file_button)
+        self.path_directory_button = QPushButton("Выбрать(Директория)", self.widget)
+        self.path_directory_button.clicked.connect(self.path_directory_button_clicked)
+        self.path_buttons_layout.addWidget(self.path_directory_button)
+        self.layout.addLayout(self.path_buttons_layout, 0, 1, 1, 1)
 
         self.shape_line = QLineEdit(self.widget)
         self.shape_line.setPlaceholderText("Путь к shape-файлу")
@@ -96,9 +101,13 @@ class CustomTab(QWidget):
     def message(self, text, time=0):
         self.status_bar.showMessage(text, time)
 
-    def path_button_clicked(self):
+    def path_file_button_clicked(self):
         path = QFileDialog.getOpenFileName(self, "Выбрать снимок")
         self.path_line.setText(path[0])
+
+    def path_directory_button_clicked(self):
+        path = QFileDialog.getExistingDirectory(self, "Выбрать директорию")
+        self.path_line.setText(path)
 
     def output_button_clicked(self):
         directory = QFileDialog.getExistingDirectory(self, "Выбрать папку")
