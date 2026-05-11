@@ -1,6 +1,7 @@
 import ast
 import logging
 import os
+import sqlite3
 from typing import List, Set, Sequence, Callable, Dict
 
 import fiona
@@ -46,8 +47,32 @@ class AbstractProcessor:
         for i in range(len(self.shapes)):
             self.match_fields.append(match_fields.get(i, "out"))
         self.callback = callback
+        self.db_path = os.path.join(self.output_path, "result.db")
+        self.db_conn = None
+        self.db_cur = None
+        self._initialize_database()
+
+    def _initialize_database(self):
+        with sqlite3.connect(self.db_path) as conn:
+            cur = conn.cursor()
+            cur.execute("CREATE TABLE IF NOT EXISTS result ("
+                           "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                           "coefficient VARCHAR(64), "
+                           "field VARCHAR(64), "
+                           "date VARCHAR(16), "
+                           "longitude REAL, "
+                           "latitude REAL,"
+                           "value REAL, "
+                           "UNIQUE(coefficient, field, date, longitude, latitude)"
+                           ")")
+            conn.commit()
 
     def run(self) -> None:
+        with sqlite3.connect(self.db_path) as self.db_conn:
+            self.db_cur = self.db_conn.cursor()
+            self._run()
+
+    def _run(self) -> None:
         raise NotImplementedError()
 
     def reproject_one(self, file_input, file_output):
@@ -77,7 +102,7 @@ class AbstractProcessor:
                         dst_crs=self.crs,
                         resampling=Resampling.bilinear)
 
-    def process_file(self, file_path: str, output_directory_path: str, date: str) -> None:
+    def process_file(self, file_path: str, coefficient: str, date: str) -> None:
         with rasterio.open(file_path) as src:
             for field_index, field_shape in enumerate(self.shapes):
                 if not field_shape:
@@ -86,9 +111,6 @@ class AbstractProcessor:
                     continue
                 field_name = self.match_fields[field_index]
                 try:
-                    if field_index >= len(self.match_fields) or self.match_fields[
-                        field_index] not in self.fields_whitelist:
-                        continue
                     try:
                         out_image, out_transform = mask(src, [field_shape], filled=False, crop=True)
                         out_image = np.ma.squeeze(out_image, axis=0)
@@ -98,32 +120,16 @@ class AbstractProcessor:
                     x_points, y_points = np.where(~out_image.mask)
                     x_coords, y_coords = rasterio.transform.xy(out_transform, x_points, y_points)
                     data = np.array([np.round(x_coords, 6), np.round(y_coords, 6), out_image.compressed()]).T
-                    df = pd.DataFrame(data, columns=["x", "y", date])
-                    if len(df.index) == 0:
-                        continue
-                    out_filename = os.path.join(output_directory_path, field_name + ".csv")
-                    if os.path.exists(out_filename):
-                        try:
-                            new_df = pd.merge(df, pd.read_csv(out_filename, sep=DELIMITER), on=['x', 'y'], how='outer',
-                                          suffixes=('_x', '_y'))
-                            bad_cols = []
-                            for col in new_df.columns:
-                                if col.endswith("_x"):
-                                    bad_cols.append(col[:-2])
-                            for base in bad_cols:
-                                x_col = f"{base}_x"
-                                y_col = f"{base}_y"
-                                new_df[base] = new_df[x_col].combine_first(new_df[y_col])
-                                new_df.drop(columns=[x_col, y_col], inplace=True)
-                            sorted_columns = ['x', 'y'] + sorted([col for col in new_df.columns if col not in ['x', 'y']])
-                            df = new_df[sorted_columns]
-                        except pd.errors.EmptyDataError:
-                            pass
-                    df.to_csv(out_filename, index=False, sep=DELIMITER)
+                    data = [(coefficient, field_name, date, x, y, val) for x, y, val in data]
+
+                    self.db_cur.executemany("INSERT OR IGNORE INTO result "
+                                    "(coefficient, field, date, longitude, latitude, value) "
+                                    "VALUES (?, ?, ?, ?, ?, ?)", data)
                 except Exception as e:
                     logger.exception(f"field_name-{field_name},file-{file_path}")
                     self.callback(f"Error with field {field_name}, file: {file_path}", callback_type="error")
                     continue
+            self.db_conn.commit()
 
     def get_coefficient_path(self, directory_path, coefficient, *args, **kwargs):
         raise NotImplementedError()

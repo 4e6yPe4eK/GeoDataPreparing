@@ -58,7 +58,7 @@ class LandsatProcessor(AbstractProcessor):
             return self.get_calculation_coefficient_path(FORMULAS[coefficient], directory, coefficient, metadata)
         return None
 
-    def run(self):
+    def _run(self):
         self.parse_directories()
         for coefficient in self.coefficients:
             path = os.path.join(self.output_path, coefficient)
@@ -82,8 +82,7 @@ class LandsatProcessor(AbstractProcessor):
                             continue
                         reprojected_path = os.path.join(self.buffer_path, coefficient + "_proc.tif")
                         self.reproject_one(path, reprojected_path)
-                        out_path = os.path.join(self.output_path, coefficient)
-                        self.process_file(reprojected_path, out_path, date)
+                        self.process_file(reprojected_path, coefficient, date)
                 except Exception as e:
                     logger.exception(f"Landsat exception in directory {directory}")
                     self.callback(f"Exception in directory {directory}", callback_type="error")

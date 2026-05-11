@@ -14,14 +14,14 @@ class DroneProcessor(AbstractProcessor):
                  callback: Callable):
         super().__init__(input_path, output_path, shape_path, expected_resolution, [str(shape_index)], {i: str(i) for i in range(shape_index + 1)}, callback)
 
-    def run(self):
+    def _run(self):
         files = glob.glob(os.path.join(self.input_path, "*"))
         for file in files:
             try:
                 with tempfile.NamedTemporaryFile(delete=False) as tmpfile:
                     tmpfile.close()
                     self.reproject_one(file, tmpfile.name)
-                    self.process_file(tmpfile.name, self.output_path, os.path.basename(file))
+                    self.process_file(tmpfile.name, "", os.path.basename(file))
                     os.unlink(tmpfile.name)
             except Exception as e:
                 logger.exception(f"Error while processing file: {file}")

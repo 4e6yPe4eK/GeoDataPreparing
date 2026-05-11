@@ -20,7 +20,7 @@ def try_extract_date(path: str) -> Optional[str]:
 
 
 class CustomProcessor(AbstractProcessor):
-    def run(self):
+    def _run(self):
         if os.path.isfile(self.input_path):
             self._process_file(self.input_path, self.output_path, "CUSTOM")
         if os.path.isdir(self.input_path):
@@ -43,7 +43,7 @@ class CustomProcessor(AbstractProcessor):
                 if src.count != 1:
                     return
             self.reproject_one(input_path, reprojected_path)
-            self.process_file(reprojected_path, output_path, date)
+            self.process_file(reprojected_path, "", date)
         except Exception as e:
             logger.exception("CustomProcessor exception")
             self.callback("Unexpected exception", callback_type="error")

@@ -47,7 +47,7 @@ class MeteorProcessor(AbstractProcessor):
             return self.get_calculation_coefficient_path(FORMULAS[coefficient], directory, coefficient, date)
         return None
 
-    def run(self):
+    def _run(self):
         self.parse_files()
         for coefficient in self.coefficients:
             path = os.path.join(self.output_path, coefficient)
@@ -66,8 +66,7 @@ class MeteorProcessor(AbstractProcessor):
                             continue
                         reprojected_path = os.path.join(self.buffer_path, coefficient + "_proc.tif")
                         self.reproject_one(path, reprojected_path)
-                        out_path = os.path.join(self.output_path, coefficient)
-                        self.process_file(reprojected_path, out_path, date)
+                        self.process_file(reprojected_path, coefficient, date)
                 except Exception as e:
                     logger.exception(f"Meteor exception in date {date}")
                     self.callback(f"Exception in date {date}", callback_type="error")
