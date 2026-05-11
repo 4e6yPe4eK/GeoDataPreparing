@@ -1,6 +1,7 @@
 import ast
 import logging
 import os
+import re
 import sqlite3
 from typing import List, Set, Sequence, Callable, Dict
 
@@ -70,10 +71,84 @@ class AbstractProcessor:
     def run(self) -> None:
         with sqlite3.connect(self.db_path) as self.db_conn:
             self.db_cur = self.db_conn.cursor()
+            self._import_from_csv()
             self._run()
+            self._export_to_csv()
 
     def _run(self) -> None:
         raise NotImplementedError()
+
+    @staticmethod
+    def _sanitize_filename(name: str) -> str:
+        safe_name = re.sub(r'[\\/*?:"<>|\s]', '_', name)
+        safe_name = safe_name.strip('.')
+        safe_name = safe_name.strip('_')
+        if not safe_name:
+            safe_name = "unnamed"
+        return safe_name
+
+    def _import_from_csv(self) -> None:
+        self.db_cur.execute("SELECT COUNT(*) FROM result")
+        if self.db_cur.fetchone()[0] > 0:
+            return
+
+        if not os.path.exists(self.output_path):
+            return
+
+        for coef_dir in os.listdir(self.output_path):
+            coef_path = os.path.join(self.output_path, coef_dir)
+            if not os.path.isdir(coef_path):
+                continue
+            coefficient = coef_dir
+            for csv_file in os.listdir(coef_path):
+                if not csv_file.endswith('.csv'):
+                    continue
+                field = csv_file[:-4]
+                csv_full_path = os.path.join(coef_path, csv_file)
+                try:
+                    df = pd.read_csv(csv_full_path, delimiter=DELIMITER)
+                    if not {'x', 'y'}.issubset(df.columns):
+                        continue
+
+                    date_columns = [col for col in df.columns if col not in ('x', 'y')]
+                    df_long = df.melt(id_vars=['x', 'y'], value_vars=date_columns,
+                                      var_name='date', value_name='value')
+                    df_long.dropna(subset=['value'], inplace=True)
+                    if df_long.empty:
+                        continue
+                    df_long['coefficient'] = coefficient
+                    df_long['field'] = field
+                    df_long.rename(columns={'x': 'longitude', 'y': 'latitude'}, inplace=True)
+                    df_long = df_long[['coefficient', 'field', 'date', 'longitude', 'latitude', 'value']]
+                    df_long.to_sql('result', self.db_conn, if_exists='append', index=False,
+                                   dtype={'coefficient': 'TEXT', 'field': 'TEXT', 'date': 'TEXT',
+                                          'longitude': 'REAL', 'latitude': 'REAL', 'value': 'REAL'})
+                except Exception as e:
+                    continue
+            self.db_conn.commit()
+
+    def _export_to_csv(self) -> None:
+        df = pd.read_sql_query(
+            "SELECT coefficient, field, date, longitude, latitude, value FROM result",
+            self.db_conn
+        )
+
+        for (coef, field), group in df.groupby(['coefficient', 'field']):
+            coef_safe = self._sanitize_filename(coef)
+            field_safe = self._sanitize_filename(field)
+
+            pivot = group.pivot(index=['longitude', 'latitude'], columns='date', values='value')
+            pivot.reset_index(inplace=True)
+            pivot.rename(columns={'longitude': 'x', 'latitude': 'y'}, inplace=True)
+
+            date_cols = [c for c in pivot.columns if c not in ('x', 'y')]
+            date_cols_sorted = sorted(date_cols)
+            pivot = pivot[['x', 'y'] + date_cols_sorted]
+
+            coef_dir = os.path.join(self.output_path, coef_safe)
+            os.makedirs(coef_dir, exist_ok=True)
+            csv_path = os.path.join(coef_dir, f"{field_safe}.csv")
+            pivot.to_csv(csv_path, index=False, sep=DELIMITER)
 
     def reproject_one(self, file_input, file_output):
         with rasterio.open(file_input) as src:
